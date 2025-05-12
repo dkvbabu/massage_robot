@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+venv/
+.env/
+
+# Logs
+logs/
+runs/
+
+# PyBullet cache
+bullet_data/
+
+# VSCode
+.vscode/
+
+# MacOS
+.DS_Store

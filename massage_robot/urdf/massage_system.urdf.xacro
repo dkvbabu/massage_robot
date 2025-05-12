@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<robot name="massage_system" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find franka_description)/robots/panda_arm.urdf.xacro"/>
+  <xacro:panda_arm prefix=""/>
+
+  <link name="massage_tool">
+    <visual>
+      <geometry><mesh filename="$(find your_pkg)/meshes/tool_pad.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="$(find your_pkg)/meshes/tool_pad.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+    </inertia>
+  </link>
+  <joint name="panda_tool_joint" type="fixed">
+    <parent link="panda_hand"/>
+    <child  link="massage_tool"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <include filename="$(find pybullet_data)/table/table.urdf"/>
+
+  <link name="human_phantom">
+    <visual>
+      <geometry><mesh filename="$(find your_pkg)/meshes/phantom.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="$(find your_pkg)/meshes/phantom.stl"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="5.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+  </link>
+  <joint name="phantom_fixed" type="fixed">
+    <parent link="table_top"/>
+    <child  link="human_phantom"/>
+    <origin xyz="0.5 0 0.75" rpy="0 0 0"/>
+  </joint>
+</robot>
