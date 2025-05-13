@@ -1,8 +1,7 @@
 
----
 
 **docs/api_reference.md**
-```markdown
+
 # API Reference
 
 ## Simulation Core
