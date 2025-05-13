@@ -1,21 +1,54 @@
 # Python
-__pycache__/
-*.py[cod]
-*.so
+
+**pycache**/
+\*.py\[cod]
+\*.so
 
 # Virtual environment
+
 venv/
 .env/
 
-# Logs
+# Logs and runs
+
 logs/
 runs/
 
-# PyBullet cache
-bullet_data/
+# Models and checkpoints
 
-# VSCode
+models/
+
+# Test and coverage
+
+.pytest\_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Distribution / packaging
+
+build/
+dist/
+\*.egg-info/
+.eggs/
+
+# PyBullet cache
+
+bullet\_data/
+
+# Archives
+
+\*.zip
+
+# IDEs
+
 .vscode/
+.idea/
 
 # MacOS
-.DS_Store
+
+.DS\_Store
+
+# Jupyter
+
+.ipynb\_checkpoints/
