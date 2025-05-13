@@ -4,5 +4,6 @@ scipy
 gym
 stable-baselines3
 torch
+tensorboard
 pytest
-pyqt5  # if GUI implemented
+pyqt5
