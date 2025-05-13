@@ -85,4 +85,7 @@ HTML and markdown docs are located in the `docs/` directory:
 - **Grid Layouts**: configure region maps and vertex indices in `execution.py` or via the GUI.
 - **Visual Inputs**: enable/disable camera observations in `gym_wrapper.py`.
 
+![image](https://github.com/user-attachments/assets/5ff23484-f2f1-4a64-a6be-5c228227a1be)
+
+
 Feel free to explore, extend, and contribute!
