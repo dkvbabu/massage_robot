@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<robot name="human_phantom">
+  <link name="phantom">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/phantom.stl"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/phantom.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="5.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.2" ixy="0.0" ixz="0.0" iyy="0.2" iyz="0.0" izz="0.2"/>
+    </inertial>
+  </link>
+</robot>
