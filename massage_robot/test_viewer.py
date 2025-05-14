@@ -15,6 +15,7 @@ from human.furniture import Furniture
 
 from robot_descriptions import ur5_description#shadow_hand_mj_description,ur5e_mj_description,
 
+from generate_path import generate_trajectory
 
 
 def main():
@@ -25,7 +26,7 @@ def main():
 
     p.setGravity(0,0,-10)
 
-    startPos = [-1,0.1,1.0]
+    startPos = [-0.7,0.1,1.0]
     cubeStartingPose = [-1.3,0.0,0.5]
 
     startOrientation = p.getQuaternionFromEuler([0,0,0])
@@ -64,9 +65,16 @@ def main():
     # Lock human joints and set velocities to 0
     joints_positions = []
     human_inst.setup_joints2(joints_positions, use_static_joints=True, reactive_force=None, reactive_gain=0.01)
-    human_inst.set_mass(human_inst.base, mass=70)
+    human_inst.set_mass(human_inst.base, mass=100)
     human_inst.set_base_velocity(linear_velocity=[0, 0, 0], angular_velocity=[0, 0, 0])
     #human_inst.reset_joints()
+
+
+    #get controllable joints only in arm
+
+    # y is head(+)-foot (-)
+    # x is body width
+
 
 
     joints_positions = []#[(human_inst.j_right_shoulder_x, 30)]
@@ -77,16 +85,53 @@ def main():
     TimeStep = 1/24.0
     p.setTimeStep(TimeStep)
 
-    for _ in range(5000):
+
+    nArmJoints = p.getNumJoints(armId, physicsClientId=physicsClient)
+
+    JointPoses = p.calculateInverseKinematics(armId, nArmJoints-2, [-0.4, 0.3, 1.05])#, 
+                                #lowerLimits=[-np.pi]*(nArmJoints-1), upperLimits=[np.pi]*(nArmJoints-1))
+    #breakpoint()
+
+
+    traj_step = 100
+    pnts = generate_trajectory(np.array([-0.4, 0.3, 1.035]),np.array([0.4, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.035)
+
+    pntsAndReturn = np.vstack((pnts,pnts[::-1]))
+
+    print(f'Number of DOFs: {nArmJoints})')
+
+    #breakpoint()
+
+
+    #JointPosesAll = p.calculateInverseKinematics2(armId, [nArmJoints-2]* traj_step,pnts.tolist())#, 
+
+    #breakpoint()
+    poses,vels,reactforces_6_val,torques =0,0,0,0
+
+    out = list(p.getJointStates(armId,[i for i in range(nArmJoints)], physicsClientId=physicsClient))
+
+    print(f'Arm poses:{[link[0] for link in out]})')
+
+    for j in range(5000):
         p.stepSimulation(physicsClientId=physicsClient)
+        JointPoses = p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])#, 
+        #p.setJointMotorControlArray(armId, jointIndices=range(nArmJoints), controlMode=p.POSITION_CONTROL, targetPositions=[1,0,0,0,0,0,0,1,1,1])
+        p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, targetPositions=JointPoses)
         time.sleep(TimeStep)
 
-    cubePos, cubeOrn = p.getBasePositionAndOrientation(planeId)
+        #out = list(p.getJointStates(armId,[i for i in range(nArmJoints)], physicsClientId=physicsClient))
 
-    print(cubePos,cubeOrn)
+        #print(f'Arm poses:{[link[0] for link in out]})')
+
+
+
+    armPos, armOrn = p.getBasePositionAndOrientation(armId)
+
+    print(armPos,armOrn)
 
     p.disconnect()
 
+    # 
 
     # Useful commands:
     # p.saveState
