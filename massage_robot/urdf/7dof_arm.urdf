@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<robot name="7dof_arm">
+  <!-- Base link -->
+  <link name="base_link">
+    <inertial>
+      <mass value="2.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <!-- Seven links and revolute joints -->
+  <xacro:macro name="link_joint" params="IDX">
+    <link name="link_${IDX}">
+      <visual>
+        <geometry><box size="0.2 0.05 0.05"/></geometry>
+      </visual>
+      <collision>
+        <geometry><box size="0.2 0.05 0.05"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="1.0"/>
+        <origin xyz="0.1 0 0" rpy="0 0 0"/>
+        <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
+      </inertial>
+    </link>
+    <joint name="joint_${IDX}" type="revolute">
+      <parent link="link_${IDX-1}"/>
+      <child link="link_${IDX}"/>
+      <origin xyz="0.2 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14" upper="3.14" effort="50" velocity="1.0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Instantiate links 1 through 7 -->
+  <link_joint IDX="1"/>
+  <link_joint IDX="2"/>
+  <link_joint IDX="3"/>
+  <link_joint IDX="4"/>
+  <link_joint IDX="5"/>
+  <link_joint IDX="6"/>
+  <link_joint IDX="7"/>
+</robot>
