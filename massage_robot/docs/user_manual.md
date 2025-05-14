@@ -110,4 +110,4 @@ Includes:
 ---
 
 For full API details, refer to `docs/api_reference.md`.
-For architecture diagrams and design rationale, see `docs/architecture.md`.
+For architecture diagrams and design rationale, see `docs/architecture.md`.   
