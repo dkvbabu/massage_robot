@@ -94,14 +94,17 @@ def main():
 
 
     traj_step = 100
-    pnts = generate_trajectory(np.array([-0.4, 0.3, 1.035]),np.array([0.4, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.035)
+    #pnts = generate_trajectory(np.array([-0.4, 0.3, 1.035]),np.array([0.4, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.035)
+    pnts = generate_trajectory(np.array([-0.15, 0.3, 1.035]),np.array([0.05, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.035)
 
     pntsAndReturn = np.vstack((pnts,pnts[::-1]))
+    #pntsAndReturn = np.clip(pntsAndReturn,a_max=10,a_min=1.01)
 
     print(f'Number of DOFs: {nArmJoints})')
 
     #breakpoint()
-
+    #print(p.getAABB(human_inst.body))
+    #((-0.30500000000000005, 0.07299999999999995, 0.823), (0.00500000000000006, 0.32700000000000007, 1.077))
 
     #JointPosesAll = p.calculateInverseKinematics2(armId, [nArmJoints-2]* traj_step,pnts.tolist())#, 
 
@@ -112,9 +115,10 @@ def main():
 
     print(f'Arm poses:{[link[0] for link in out]})')
 
+    #breakpoint()
     for j in range(5000):
         p.stepSimulation(physicsClientId=physicsClient)
-        JointPoses = p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])#, 
+        JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)]))#, 
         #p.setJointMotorControlArray(armId, jointIndices=range(nArmJoints), controlMode=p.POSITION_CONTROL, targetPositions=[1,0,0,0,0,0,0,1,1,1])
         p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, targetPositions=JointPoses)
         time.sleep(TimeStep)
@@ -123,6 +127,10 @@ def main():
 
         #print(f'Arm poses:{[link[0] for link in out]})')
 
+        if j%int(2/TimeStep):
+            p1,p2 = p.getAABB(human_inst.body)
+            pnts = generate_trajectory(np.array([p1[0]+0.15, 0.3, p2[2]-0.04]),np.array([p2[0]+0.1, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.035)
+            pntsAndReturn = np.vstack((pnts,pnts[::-1]))
 
 
     armPos, armOrn = p.getBasePositionAndOrientation(armId)
