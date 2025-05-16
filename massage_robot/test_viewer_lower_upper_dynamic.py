@@ -214,10 +214,7 @@ def main():
 
         idx = j % total_pts
         target = pntsAndReturn[idx]
-
-        # Print trajectory details
-        print(f"Step {j:4d} | idx {idx:4d}/{total_pts} → target = {target}")
-
+        
         JointPoses = p.calculateInverseKinematics(
             armId, wrist_link, target
         )
