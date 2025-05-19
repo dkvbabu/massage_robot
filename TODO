@@ -11,3 +11,69 @@
 
 [ ] Add camera
 
+
+
+
+
+
+
+# 
+
+# Useful commands:
+# p.saveState
+# p.restoreState
+# p.setTimestep
+
+
+# p.getEulerFromQuaternion(quat) -->  [roll, pitch, yaw]
+
+# p.getJointInfo()
+
+# p.setJointMotorControl2() # make joint fixed max_force=0
+
+# p.setJointMotorControlMultiDof()
+
+# p.getJointStates() --> [pos, vel, forces, torque]
+# p.getLinkStates()
+
+# p.getDynamicsInfo() --> [mass, center of mass,friction]
+
+
+# p.startStateLogging(), p.stopStateLogging()
+
+
+# p.getBasePositionAndOrientation(bodyUniqueId)
+
+
+# p.computeViewMatrix()
+# p.computeProjectionMatrix()
+
+# p.getCameraImage() --> [rgb, depth]
+
+# p.getContactPoints()
+# p.getClosestPoints()
+
+# Lidar:
+# p.rayTest()
+# p.rayTestBatch()
+
+# self-collosion (URDF_USE_SELF_COLLOSION) in p.loadURDF
+
+# IK
+# p.calculateInverseDynamics() --> forces
+# p.calculateInverseKinematics() -->  joint angles
+
+# p.calculateInverseKinematics2() --> list of angles
+
+
+# Deformable
+
+# pybullet.resetSimulation(p.RESET_USE_DEFORMABLE_WORLD)
+# in .urdf file: <deformable name="y"> </deformable>
+
+
+
+
+
+# TODO
+# Timestep issue
