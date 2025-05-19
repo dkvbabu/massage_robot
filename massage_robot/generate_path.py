@@ -2,6 +2,18 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
 
+
+def generate_trajectory(startPnt,endPnt,numSamples=100,frequency=3,amp=0.1):
+
+
+    pnts = np.linspace(np.array(startPnt),np.array(endPnt),num=numSamples)
+
+    sin_waves = np.sin(np.linspace(-frequency*np.pi,frequency*np.pi,num=numSamples))*amp
+    pnts[:,2] += sin_waves
+
+    return pnts
+
+
 class PathGenerationProgram:
     """
     Generates a full end-effector trajectory with approach, main stroke, and retract phases.
