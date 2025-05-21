@@ -4,6 +4,8 @@ import pybullet_data
 import numpy as np
 import cv2
 
+from utils import get_extrinsics,get_intrinsics
+
 import configparser
 
 from human.human_creation import HumanCreation
@@ -19,21 +21,24 @@ from robot_descriptions import ur5_description#shadow_hand_mj_description,ur5e_m
 from generate_path import generate_trajectory
 
 
-def draw_data(Forces,armparts,bodyparts):
+def draw_data(Forces,armparts,bodyparts,old_path,new_path):
 
     # Show pressure Profile
-    plt.subplot(311)
+    plt.subplot(411)
     plt.title(f'Massage Pressure: Mean {np.mean(Forces):.2f}')
     plt.plot(Forces)
-    plt.subplot(312)
+    plt.subplot(412)
     plt.title('Arm Part')
     plt.plot(armparts)
-    plt.subplot(313)
+    plt.subplot(413)
     plt.title('Body Part')
     plt.plot(bodyparts)
+    plt.subplot(414)
+    plt.title('Massage Paths')
+    plt.plot(old_path,label='sinusoidal')
+    plt.plot(new_path,label='surface level')
+    plt.legend()
     plt.show()
-
-
 
 def arm_camera(projection_matrix,armId=2):
 
@@ -96,7 +101,7 @@ def load_scene(physicsClient):
 
 def main():
 
-    physicsClient = p.connect(p.GUI)
+    physicsClient = p.connect(p.DIRECT)
 
     p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
     p.setGravity(0,0,-10)
@@ -127,6 +132,8 @@ def main():
     # Good Cam 2
     #(1024, 768, (-0.041878849267959595, -0.6659466028213501, 0.7448229789733887, 0.0, 0.9991226196289062, -0.027913566678762436, 0.0312197208404541, 0.0, 0.0, 0.7454769015312195, 0.6665313839912415, 0.0, -0.14472033083438873, -0.7917931079864502, -1.0678036212921143, 1.0), (0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0, 0.0, 0.0, -0.02000020071864128, 0.0), (0.0, 0.0, 1.0), (-0.7448229789733887, -0.0312197208404541, -0.6665313839912415), (-1116.7694091796875, 26643.2734375, 0.0), (-13318.9326171875, -558.2713623046875, 14909.5400390625), 92.40018463134766, -41.799922943115234, 1.0, (-0.4828510880470276, 0.12460841238498688, 0.6354567408561707))
 
+    # Up Cam 3
+    #(1024, 768, (-0.0017075804062187672, -0.9999969005584717, 0.001745292916893959, 0.0, 0.9999985098838806, -0.0017075776122510433, 2.9802324661432067e-06, 0.0, 0.0, 0.0017452954780310392, 0.9999983906745911, 0.0, -0.1250828057527542, -0.2837464511394501, -1.9349620342254639, 1.0), (0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0, 0.0, 0.0, -0.02000020071864128, 0.0), (0.0, 0.0, 1.0), (-0.001745292916893959, -2.9802324661432067e-06, -0.9999983906745911), (-45.53548049926758, 26666.62890625, 0.0), (-19999.939453125, -34.15155792236328, 34.90591049194336), 90.0999984741211, -89.9000015258789, 1.2999999523162842, (-0.2828510105609894, 0.12460000067949295, 0.6354566812515259))
 
 
 
@@ -141,10 +148,25 @@ def main():
     )
     p.resetDebugVisualizerCamera(cameraYaw= 92.4,cameraPitch=-41.8,cameraDistance=1.0,cameraTargetPosition=(-0.4828510, 0.12460, 0.6354567),)
 
+    # Up view
+    p.resetDebugVisualizerCamera(cameraYaw= 90.1,cameraPitch=-89.9,cameraDistance=1.3,cameraTargetPosition=(-0.2828510, 0.12460, 0.6354567),)
+
+
+
     cam1_vmat = (-0.9937682151794434, -0.07253935188055038, 0.08463338017463684, 0.0, 0.1114664301276207, -0.6467175483703613, 0.754540741443634, 0.0, 0.0, 0.7592723965644836, 0.6507730484008789, 0.0, -0.18283233046531677, -0.3637703061103821, -1.4271166324615479, 1.0)
+
     cam1_pmat = (0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0, 0.0, 0.0, -0.02000020071864128, 0.0)
 
+    cam_upview = (-0.0017075804062187672, -0.9999969005584717, 0.001745292916893959, 0.0, 0.9999985098838806, -0.0017075776122510433, 2.9802324661432067e-06, 0.0, 0.0, 0.0017452954780310392, 0.9999983906745911, 0.0, -0.1250828057527542, -0.2837464511394501, -1.9349620342254639, 1.0)
 
+    cam_upproj = (0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0, 0.0, 0.0, -0.02000020071864128, 0.0)
+
+    Width = 1024
+    Height = 768
+
+    K = get_intrinsics(np.array(cam_upproj).reshape(4,4),Width, Height)
+    RT = get_extrinsics(np.array(cam_upview).reshape(4,4))
+    PMat = (K@RT.T[:3,:])
     # Setup Path
     nArmJoints = p.getNumJoints(armId, physicsClientId=physicsClient)
 
@@ -163,6 +185,11 @@ def main():
     bodyparts = []
     armparts = []
 
+    old_path = []
+    new_path = []
+
+    far_ = 1000
+    near_ = 0.01
     for j in range(1200):
 
         p.stepSimulation(physicsClientId=physicsClient)
@@ -184,22 +211,71 @@ def main():
         pntsAndReturn[j%(2*traj_step),2] += 2*(out[0][6][2]-0.005)
         pntsAndReturn[j%(2*traj_step),2] /= 3
 
-        JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])) 
 
-        p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, 
-                                    targetPositions=JointPoses,forces=100*np.ones_like(JointPoses))
-        time.sleep(TimeStep)
+        #time.sleep(TimeStep)
+        #print(f'Pnt: {pntsAndReturn[j%(2*traj_step)]}')
+        ImagArmPnt = (PMat@(np.array(list(pntsAndReturn[j%(2*traj_step)])+[1])[:,None]))
+
+        ImagArmPnt /= ImagArmPnt[-1]
+        #breakpoint()
         # Get the current camera
         cam = p.getDebugVisualizerCamera()
 
 
         # try hide arm with  changeVisualShape
         #print(cam)
-        img_out = p.getCameraImage(640, 480, cam1_vmat, cam1_pmat)
-        img = np.array(img_out[2]).reshape(480, 640,-1)[:,:,:3].astype(np.uint8)# RGBA
-        #img = arm_camera(projection_matrix,armId=armId)
-        cv2.imshow('img',img)
-        cv2.waitKey(1)
+        if True:
+            img_out = p.getCameraImage(Width, Height, cam_upview, cam_upproj)
+            #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
+
+            depth = np.array(img_out[3]).reshape(Height, Width)#.astype(np.uint8)# depth
+            nDepth = (far_*near_/(far_-(far_-near_)*depth))
+
+            nDepth -= nDepth.max()
+            nDepth = -1*nDepth
+
+            #depth -= depth.min()
+            #depth /= depth.max()
+            #img = arm_camera(projection_matrix,armId=armId)
+
+            mask = np.array(img_out[4]).reshape(Height, Width)#.astype(np.uint8)# depth
+
+            Depth2Show = nDepth * (mask==human_inst.body)
+            Z_surface = Depth2Show[int(ImagArmPnt[1]),int(ImagArmPnt[0])]
+            #print(Z_surface)
+            #Depth2Show /= Depth2Show.max()
+            #img = (Depth2Show*255).astype(np.uint8).astype(np.uint8)
+            #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
+
+            #cv2.imshow('img',((mask==human_inst.body)*255).astype(np.uint8))
+            # convert to RGB
+
+            #img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            #print(ImagArmPnt[:2].flatten().astype(np.int32))
+            #print(f'Old Z: {pntsAndReturn[j%(2*traj_step)][2]}, New Z: {Z_surface}: diff {abs(pntsAndReturn[j%(2*traj_step)][2]-Z_surface)}')
+
+            old_path.append(pntsAndReturn[j%(2*traj_step)][2])
+            new_path.append(Z_surface)
+
+            if Z_surface:
+                #pntsAndReturn[j%(2*traj_step)][2] += Z_surface
+                #pntsAndReturn[j%(2*traj_step)][2] /= 2
+
+                pntsAndReturn[j%(2*traj_step)][2] = min(Z_surface,pntsAndReturn[j%(2*traj_step)][2])
+
+            else:
+                new_path[-1] = pntsAndReturn[j%(2*traj_step)][2]
+            #cv2.circle(img,ImagArmPnt[:2].flatten().astype(np.int32),radius=10,color=(255,0,0),thickness=-1)
+
+            #cv2.imshow('img',img)
+            #cv2.waitKey(1)
+
+
+        # act
+        JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])) 
+
+        p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, 
+                                    targetPositions=JointPoses,forces=100*np.ones_like(JointPoses))
 
         if j%int(2/TimeStep):
             # Update Path
@@ -216,7 +292,7 @@ def main():
 
     p.disconnect()
 
-    draw_data(Forces,armparts,bodyparts)
+    draw_data(Forces,armparts,bodyparts,old_path=old_path,new_path=new_path)
 
 
 if __name__ == "__main__":
