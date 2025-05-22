@@ -267,7 +267,7 @@ freq_entry.grid(row=0, column=1, padx=5, pady=5)
 
 tk.Label(root, text="Amplitude:").grid(row=1, column=0, padx=5, pady=5)
 amp_entry = tk.Entry(root)
-amp_entry.insert(0, "0.035")
+amp_entry.insert(0, "0.01")
 amp_entry.grid(row=1, column=1, padx=5, pady=5)
 
 tk.Label(root, text="X Offset:").grid(row=2, column=0, padx=5, pady=5)
@@ -331,7 +331,7 @@ def visualize_contact_force(armId, human_body, physicsClient):
     if contact_points:
         contacting_link_index = contact_points[0][3]
         contact_force = contact_points[0][9]
-        max_force = 100
+        max_force = 30
         intensity = min(contact_force / max_force, 1.0)
         color = [1, 1 - intensity, 1 - intensity, 1]
         p.changeVisualShape(objectUniqueId=armId, linkIndex=contacting_link_index, rgbaColor=color, physicsClientId=physicsClient)
@@ -410,8 +410,8 @@ def random_search_td3(env_params, search_iters=10):
 
 class MassageEnv:
     def __init__(self, physicsClient, armId, human_inst, nArmJoints, traj_step=100,
-                 frequency=6, amp=0.035, x_offset=0.1, z_offset_lower=0.01, z_offset_upper=0.1,
-                 region='lower_back', force_limit=100, traj_type='sine', massage_technique='normal',
+                 frequency=3, amp=0.01, x_offset=0.1, z_offset_lower=0.01, z_offset_upper=0.1,
+                 region='lower_back', force_limit=30, traj_type='sine', massage_technique='normal',
                  max_steps=300):
         self.physicsClient = physicsClient
         self.armId = armId
@@ -430,7 +430,7 @@ class MassageEnv:
         self.massage_technique = massage_technique
 
         self.joint_indices = list(range(1, nArmJoints - 3))
-        self.delta_angle = 0.05
+        self.delta_angle = 0.01
 
         from itertools import product
         self.action_space = list(product([-self.delta_angle, 0, self.delta_angle], repeat=len(self.joint_indices)))
@@ -1026,13 +1026,13 @@ def run_inference_with_trained_model(model_type='dqn', model_path=None, num_step
 
     env = MassageEnv(physicsClient, armId, human_inst, nArmJoints,
                      traj_step=100,
-                     frequency=6,
-                     amp=0.035,
+                     frequency=3,
+                     amp=0.01,
                      x_offset=0.1,
                      z_offset_lower=0.01,
                      z_offset_upper=0.1,
                      region='lower_back',
-                     force_limit=100,
+                     force_limit=30,
                      traj_type='sine',
                      massage_technique='normal')
 
@@ -1047,7 +1047,7 @@ def run_inference_with_trained_model(model_type='dqn', model_path=None, num_step
         agent.epsilon = 0.0
     elif model_type.lower() == 'ppo':
        # Use the hidden size that matches your saved model
-        hidden_size = 128  # or 256, whichever you trained with
+        hidden_size = 256  # or 256, whichever you trained with
         agent = PPOAgent(state_size, action_size, device=device, hidden_size=hidden_size)
         if model_path is not None:
             agent.load(model_path)
@@ -1366,7 +1366,7 @@ def run_td3_inference(frequency, amplitude, x_offset, z_offset_lower, z_offset_u
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    hidden_size = 128  # Use the hidden size used during training
+    hidden_size = 256  # Use the hidden size used during training
     agent = TD3Agent(state_size, action_size, max_action, device=device, hidden_size=hidden_size)
     agent.load(model_path)
 
