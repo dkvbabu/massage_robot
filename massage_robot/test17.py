@@ -488,60 +488,6 @@ def start_simulation():
                                                                z_offset_lower, z_offset_upper, region, force, traj_type, massage_technique),
                                     start_button.config(state=tk.NORMAL)]).start()
 
-
-# GUI setup
-root = tk.Tk()
-root.title("Simulation Parameters")
-
-tk.Label(root, text="Frequency:").grid(row=0, column=0, padx=5, pady=5)
-freq_entry = tk.Entry(root)
-freq_entry.insert(0, "6")
-freq_entry.grid(row=0, column=1, padx=5, pady=5)
-
-tk.Label(root, text="Amplitude:").grid(row=1, column=0, padx=5, pady=5)
-amp_entry = tk.Entry(root)
-amp_entry.insert(0, "0.01")
-amp_entry.grid(row=1, column=1, padx=5, pady=5)
-
-tk.Label(root, text="X Offset:").grid(row=2, column=0, padx=5, pady=5)
-x_offset_entry = tk.Entry(root)
-x_offset_entry.insert(0, "0.1")
-x_offset_entry.grid(row=2, column=1, padx=5, pady=5)
-
-tk.Label(root, text="Z Offset Lower:").grid(row=3, column=0, padx=5, pady=5)
-z_offset_lower_entry = tk.Entry(root)
-z_offset_lower_entry.insert(0, "0.01")
-z_offset_lower_entry.grid(row=3, column=1, padx=5, pady=5)
-
-tk.Label(root, text="Z Offset Upper:").grid(row=4, column=0, padx=5, pady=5)
-z_offset_upper_entry = tk.Entry(root)
-z_offset_upper_entry.insert(0, "0.1")
-z_offset_upper_entry.grid(row=4, column=1, padx=5, pady=5)
-
-region_var = tk.StringVar(value='lower_back')
-tk.Label(root, text="Target Region:").grid(row=5, column=0, padx=5, pady=5)
-region_menu = tk.OptionMenu(root, region_var, 'lower_back', 'upper_back')
-region_menu.grid(row=5, column=1, padx=5, pady=5)
-
-tk.Label(root, text="Force:").grid(row=6, column=0, padx=5, pady=5)
-force_entry = tk.Entry(root)
-force_entry.insert(0, "100")
-force_entry.grid(row=6, column=1, padx=5, pady=5)
-
-traj_type_var = tk.StringVar(value='sine')
-tk.Label(root, text="Trajectory Type:").grid(row=7, column=0, padx=5, pady=5)
-traj_type_menu = tk.OptionMenu(root, traj_type_var, 'sine', 'circular', 'linear')
-traj_type_menu.grid(row=7, column=1, padx=5, pady=5)
-
-massage_technique_var = tk.StringVar(value='normal')
-tk.Label(root, text="Massage Technique:").grid(row=8, column=0, padx=5, pady=5)
-massage_technique_menu = tk.OptionMenu(root, massage_technique_var, 'normal', 'kneading', 'pressure')
-massage_technique_menu.grid(row=8, column=1, padx=5, pady=5)
-
-start_button = tk.Button(root, text="Start Simulation", command=start_simulation)
-start_button.grid(row=9, column=5, columnspan=2, pady=10)
-
-
 # === RL Training additions start here ===
 def visualize_contact(armId, human_body, physicsClient):
     contact_points = p.getContactPoints(bodyA=armId, bodyB=human_body, physicsClientId=physicsClient)
@@ -1908,31 +1854,88 @@ def start_td3_tuning():
     env_params = get_env_params_from_gui()
     threading.Thread(target=random_search_td3, args=(env_params, 10), daemon=True).start()
 
-dqn_infer_button = tk.Button(root, text="Run DQN Inference", command=start_dqn_inference_gui)
-dqn_infer_button.grid(row=14, column=0, columnspan=2, pady=10)
+root = tk.Tk()
+root.title("Simulation Parameters")
 
-ppo_infer_button = tk.Button(root, text="Run PPO Inference", command=start_ppo_inference_gui)
-ppo_infer_button.grid(row=14, column=5, columnspan=2, pady=10)
+# Parameter inputs (Labels and Entries)
+tk.Label(root, text="Frequency:").grid(row=0, column=0, sticky='w', padx=5, pady=4)
+freq_entry = tk.Entry(root)
+freq_entry.insert(0, "6")
+freq_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=4)
 
-rl_button = tk.Button(root, text="Start RL Training(DQN)", command=start_rl_training_gui)
-rl_button.grid(row=11, column=0, columnspan=2, pady=10)
+tk.Label(root, text="Amplitude:").grid(row=1, column=0, sticky='w', padx=5, pady=4)
+amp_entry = tk.Entry(root)
+amp_entry.insert(0, "0.01")
+amp_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=4)
 
-ppo_button = tk.Button(root, text="Start PPO Training", command=start_ppo_training_gui)
-ppo_button.grid(row=12, column=0, columnspan=2, pady=10)
+tk.Label(root, text="X Offset:").grid(row=2, column=0, sticky='w', padx=5, pady=4)
+x_offset_entry = tk.Entry(root)
+x_offset_entry.insert(0, "0.1")
+x_offset_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=4)
 
-train_td3_button = tk.Button(root, text="Train TD3", command=start_td3_training_gui)
-train_td3_button.grid(row=13, column=0, columnspan=2, pady=10)
+tk.Label(root, text="Z Offset Lower:").grid(row=3, column=0, sticky='w', padx=5, pady=4)
+z_offset_lower_entry = tk.Entry(root)
+z_offset_lower_entry.insert(0, "0.01")
+z_offset_lower_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=4)
 
-infer_td3_button = tk.Button(root, text="Run TD3 Inference", command=start_td3_inference_gui)
-infer_td3_button.grid(row=14, column=20, padx=10, pady=10)
+tk.Label(root, text="Z Offset Upper:").grid(row=4, column=0, sticky='w', padx=5, pady=4)
+z_offset_upper_entry = tk.Entry(root)
+z_offset_upper_entry.insert(0, "0.1")
+z_offset_upper_entry.grid(row=4, column=1, sticky='ew', padx=5, pady=4)
 
-dqn_tune_button = tk.Button(root, text="Tune DQN Hyperparams", command=start_dqn_tuning)
-dqn_tune_button.grid(row=11, column=20)  
+tk.Label(root, text="Target Region:").grid(row=5, column=0, sticky='w', padx=5, pady=4)
+region_var = tk.StringVar(value='lower_back')
+region_menu = tk.OptionMenu(root, region_var, 'lower_back', 'upper_back')
+region_menu.grid(row=5, column=1, sticky='ew', padx=5, pady=4)
 
-ppo_tune_button = tk.Button(root, text="Tune PPO Hyperparams", command=start_ppo_tuning)
-ppo_tune_button.grid(row=12, column=20)  
+tk.Label(root, text="Force:").grid(row=6, column=0, sticky='w', padx=5, pady=4)
+force_entry = tk.Entry(root)
+force_entry.insert(0, "100")
+force_entry.grid(row=6, column=1, sticky='ew', padx=5, pady=4)
 
-td3_tune_button = tk.Button(root, text="Tune TD3 Hyperparams", command=start_td3_tuning)
-td3_tune_button.grid(row=13, column=20, )  
+tk.Label(root, text="Trajectory Type:").grid(row=7, column=0, sticky='w', padx=5, pady=4)
+traj_type_var = tk.StringVar(value='sine')
+traj_type_menu = tk.OptionMenu(root, traj_type_var, 'sine', 'circular', 'linear')
+traj_type_menu.grid(row=7, column=1, sticky='ew', padx=5, pady=4)
+
+tk.Label(root, text="Massage Technique:").grid(row=8, column=0, sticky='w', padx=5, pady=4)
+massage_technique_var = tk.StringVar(value='normal')
+massage_technique_menu = tk.OptionMenu(root, massage_technique_var, 'normal', 'kneading', 'pressure')
+massage_technique_menu.grid(row=8, column=1, sticky='ew', padx=5, pady=4)
+
+# Buttons (arranged in multiple columns)
+button_width = 20
+button_padx = 5
+button_pady = 5
+
+start_button = tk.Button(root, text="Start Simulation", command=start_simulation, width=button_width)
+start_button.grid(row=0, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+rl_button = tk.Button(root, text="Start RL Training (DQN)", command=start_rl_training_gui, width=button_width)
+rl_button.grid(row=1, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+ppo_button = tk.Button(root, text="Start PPO Training", command=start_ppo_training_gui, width=button_width)
+ppo_button.grid(row=2, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+train_td3_button = tk.Button(root, text="Train TD3", command=start_td3_training_gui, width=button_width)
+train_td3_button.grid(row=3, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+dqn_infer_button = tk.Button(root, text="Run DQN Inference", command=start_dqn_inference_gui, width=button_width)
+dqn_infer_button.grid(row=4, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+ppo_infer_button = tk.Button(root, text="Run PPO Inference", command=start_ppo_inference_gui, width=button_width)
+ppo_infer_button.grid(row=5, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+infer_td3_button = tk.Button(root, text="Run TD3 Inference", command=start_td3_inference_gui, width=button_width)
+infer_td3_button.grid(row=6, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+dqn_tune_button = tk.Button(root, text="Tune DQN Hyperparams", command=start_dqn_tuning, width=button_width)
+dqn_tune_button.grid(row=7, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+ppo_tune_button = tk.Button(root, text="Tune PPO Hyperparams", command=start_ppo_tuning, width=button_width)
+ppo_tune_button.grid(row=8, column=2, columnspan=2, padx=button_padx, pady=button_pady)
+
+td3_tune_button = tk.Button(root, text="Tune TD3 Hyperparams", command=start_td3_tuning, width=button_width)
+td3_tune_button.grid(row=9, column=2, columnspan=2, padx=button_padx, pady=button_pady)
 
 root.mainloop()
