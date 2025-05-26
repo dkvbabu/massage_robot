@@ -75,7 +75,9 @@ def load_scene(physicsClient):
     def config(tag, section=None):
         return float(configP['' if section is None else section][tag])
 
-    human_inst.init(human_creation, None,True, 'random', 'random',config=config,id=physicsClient,np_random=np.random)
+    gender = 'male'
+    human_inst.init(human_creation, None,True, 'none', gender,config=None,id=physicsClient,
+                    np_random=np.random,mass=70,radius_scale=1.2, height_scale=1.1)
 
     # Add bed
     furniture = Furniture()
@@ -114,10 +116,14 @@ def main():
     startOrientation = p.getQuaternionFromEuler([0,0,0])
 
     planeId = p.loadURDF("plane.urdf")
-    armId = p.loadURDF(ur5_description.URDF_PATH,startPos, startOrientation)
+    #armId = p.loadURDF(ur5_description.URDF_PATH,startPos, startOrientation)
+    armId = p.loadURDF('urdf/ur5_robot.urdf',startPos, startOrientation)
     cubeId = p.loadURDF("cube.urdf",cubeStartingPose, startOrientation)
 
     p.resetJointState(armId,1,-0.4)
+    p.resetJointState(armId,4,-2.0)
+    p.resetJointState(armId,5,-1.5)
+    #p.resetJointState(armId,6,-1.7)
     #p.resetJointState(armId,2,-1)
     #p.resetJointState(armId,3,0.2)
     TimeStep = 1/24.0
@@ -304,7 +310,8 @@ def main():
         cv2.imshow('Depth Map',img)
         cv2.waitKey(1)
 
-
+        #states = p.getJointStates(armId,[0,1,2,3,4,5,6,7,8])
+        #print([state[0] for state in states])
 
         # act
         JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])) 

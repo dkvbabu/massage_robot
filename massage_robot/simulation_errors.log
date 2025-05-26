@@ -1,0 +1,1 @@
+ERROR:root:Error at step 228 with params {'frequency': 6.0, 'amp': 0.035, 'x_offset': 0.1, 'z_offset_lower': 0.01, 'z_offset_upper': 0.1, 'region': 'lower_back', 'force': 100.0, 'traj_type': 'circular', 'massage_technique': 'normal'}: Not connected to physics server.
