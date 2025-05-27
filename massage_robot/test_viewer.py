@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 from robot_descriptions import ur5_description#shadow_hand_mj_description,ur5e_mj_description,
 
 from generate_path import generate_trajectory
+from scipy.spatial.transform import Rotation
+
+
 
 
 def draw_data(Forces,armparts,bodyparts,old_path,new_path,actual_path):
@@ -111,7 +114,7 @@ def main():
     p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
     p.setGravity(0,0,-10)
 
-    startPos = [-0.7,0.1,1.0]
+    startPos = [-0.8,0.1,1.0]
     cubeStartingPose = [-1.3,0.0,0.5]
     startOrientation = p.getQuaternionFromEuler([0,0,0])
 
@@ -121,6 +124,8 @@ def main():
     cubeId = p.loadURDF("cube.urdf",cubeStartingPose, startOrientation)
 
     p.resetJointState(armId,1,-0.4)
+    p.resetJointState(armId,2,-0.9)
+    p.resetJointState(armId,3,1)
     p.resetJointState(armId,4,-2.0)
     p.resetJointState(armId,5,-1.5)
     #p.resetJointState(armId,6,-1.7)
@@ -183,10 +188,10 @@ def main():
     nArmJoints = p.getNumJoints(armId, physicsClientId=physicsClient)
 
     JointPoses = p.calculateInverseKinematics(armId, nArmJoints-2, [-0.4, 0.3, 1.05]) 
-    traj_step = 100
-    pnts = generate_trajectory(np.array([-0.175, 0.3, 1.035]),np.array([0.05, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.01)
+    traj_step = 200
+    pnts = generate_trajectory(np.array([-0.13, 0.3, 1.035]),np.array([0.05, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.01)
 
-    pntsAndReturn = np.vstack((pnts,pnts[::-1]))
+    pntsAndReturn = np.vstack((pnts[::-1],pnts))
     print(f'Number of DOFs: {nArmJoints})')
 
 
@@ -206,11 +211,16 @@ def main():
     far_ = 1000
     near_ = 0.01
 
-    EndEfferctorId = 9
-    for j in range(1200):
+    rot = Rotation.from_euler('xyz', [0, 180, 0], degrees=True)
+
+    rot_quat = rot.as_quat()
+
+
+    EndEfferctorId = nArmJoints-3
+    for j in range(240):
 
         p.stepSimulation(physicsClientId=physicsClient)
-        out = p.getClosestPoints(armId,human_inst.body,3,EndEfferctorId)#5
+        out = p.getClosestPoints(armId,human_inst.body,10,EndEfferctorId)#5
         out_1 = p.getContactPoints(armId,human_inst.body)
 
         if len(out_1):
@@ -223,7 +233,6 @@ def main():
             bodyparts.append(0)
             armparts.append(0)
             Forces.append(0)
-
         # Augment Path
         pntsAndReturn[j%(2*traj_step),2] += 2*(out[0][6][2]-0.005)
         pntsAndReturn[j%(2*traj_step),2] /= 3
@@ -245,7 +254,7 @@ def main():
         # try hide arm with  changeVisualShape
         #print(cam)
         # every two seconds
-        if j%int(0.5/TimeStep):
+        if j%int(0.1/TimeStep):
             img_out = p.getCameraImage(Width, Height, cam_upview, cam_upproj)
             #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
 
@@ -292,7 +301,7 @@ def main():
             pntsAndReturn[j%(2*traj_step)][2] += Z_surface
             pntsAndReturn[j%(2*traj_step)][2] /= 2
 
-            pntsAndReturn[j%(2*traj_step)][2] = np.clip(pntsAndReturn[j%(2*traj_step)][2],Z_surface-0.005,Z_surface+-0.005) # 0.5 cm
+            pntsAndReturn[j%(2*traj_step)][2] = np.clip(pntsAndReturn[j%(2*traj_step)][2],Z_surface-0.01,Z_surface+0.01) # 1 cm
             #min(Z_surface,pntsAndReturn[j%(2*traj_step)][2])
 
         else:
@@ -303,6 +312,8 @@ def main():
 
         #breakpoint()
 
+        print(ImagArmPnt.T[0,:2],ArmLinkPnt.T[0,:2])
+        print(rot_quat)
         cv2.circle(img,ImagArmPnt[:2].flatten().astype(np.int32),radius=4,color=(255,0,0),thickness=-1)
         cv2.circle(img,ArmLinkPnt[:2].flatten().astype(np.int32),radius=4,color=(0,255,0),thickness=-1)
 
@@ -313,19 +324,19 @@ def main():
         #print([state[0] for state in states])
 
         # act
-        JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])) 
+        # TODO taget orientation # we need only 3
+        jointIndx = [1,2,3,4,5,6]
+        JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)],
+                                                       ))#rot_quat.tolist())) 
+        p.setJointMotorControlArray(armId, jointIndices=jointIndx, controlMode=p.POSITION_CONTROL, 
+                                    targetPositions=[JointPoses[j-1] for j in jointIndx],forces=100*np.ones_like(jointIndx))
         print(JointPoses)
-        p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, 
-                                    targetPositions=JointPoses,forces=100*np.ones_like(JointPoses))
-
-
-
         if j%int(2/TimeStep):
             # Update Path
             p1,p2 = p.getAABB(human_inst.body)
             #pnts = generate_trajectory(np.array([p1[0]+0.125, 0.3, p2[2]-0.04]),np.array([p2[0]+0.1, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.035)
-            pnts = generate_trajectory(np.array([p1[0]+0.1, 0.3, p2[2]-0.04]),np.array([p2[0]+0.05, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.01)
-            pntsAndReturn = np.vstack((pnts,pnts[::-1]))
+            pnts = generate_trajectory(np.array([p1[0]+0.2, 0.3, p2[2]-0.04]),np.array([p2[0]+0.05, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.01)
+            pntsAndReturn = np.vstack((pnts[::-1],pnts))
 
 
     cv2.destroyAllWindows()
