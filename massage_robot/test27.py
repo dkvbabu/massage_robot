@@ -427,7 +427,7 @@ def run_simulation_with_params(frequency, amplitude, x_offset, z_offset_lower, z
 
     planeId = p.loadURDF("plane.urdf")
     #armId = p.loadURDF(ur5_description.URDF_PATH, startPos, startOrientation)
-    urdf_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "ur5_robot_mod.urdf")
+    urdf_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "urdf/ur5_robot_mod.urdf")
     try:
         armId = p.loadURDF(urdf_path, startPos, startOrientation)
     except Exception as e:
