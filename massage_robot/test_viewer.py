@@ -164,7 +164,6 @@ def main():
     p.resetDebugVisualizerCamera(cameraYaw= 90.1,cameraPitch=-89.9,cameraDistance=1.3,cameraTargetPosition=(-0.2828510, 0.12460, 0.6354567),)
 
 
-
     cam1_vmat = (-0.9937682151794434, -0.07253935188055038, 0.08463338017463684, 0.0, 0.1114664301276207, -0.6467175483703613, 0.754540741443634, 0.0, 0.0, 0.7592723965644836, 0.6507730484008789, 0.0, -0.18283233046531677, -0.3637703061103821, -1.4271166324615479, 1.0)
 
     cam1_pmat = (0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0, 0.0, 0.0, -0.02000020071864128, 0.0)
@@ -207,7 +206,7 @@ def main():
     far_ = 1000
     near_ = 0.01
 
-    EndEfferctorId = 7
+    EndEfferctorId = 9
     for j in range(1200):
 
         p.stepSimulation(physicsClientId=physicsClient)
@@ -315,7 +314,7 @@ def main():
 
         # act
         JointPoses = list(p.calculateInverseKinematics(armId, nArmJoints-2, pntsAndReturn[j%(2*traj_step)])) 
-
+        print(JointPoses)
         p.setJointMotorControlArray(armId, jointIndices=range(1,nArmJoints-3), controlMode=p.POSITION_CONTROL, 
                                     targetPositions=JointPoses,forces=100*np.ones_like(JointPoses))
 
