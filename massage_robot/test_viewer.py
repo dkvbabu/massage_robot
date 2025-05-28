@@ -188,7 +188,7 @@ def main():
     nArmJoints = p.getNumJoints(armId, physicsClientId=physicsClient)
 
     JointPoses = p.calculateInverseKinematics(armId, nArmJoints-2, [-0.4, 0.3, 1.05]) 
-    traj_step = 200
+    traj_step = 100
     pnts = generate_trajectory(np.array([-0.13, 0.3, 1.035]),np.array([0.05, 0.3, 1.035]),numSamples=traj_step,frequency=6,amp=0.01)
 
     pntsAndReturn = np.vstack((pnts[::-1],pnts))
@@ -211,13 +211,12 @@ def main():
     far_ = 1000
     near_ = 0.01
 
-    rot = Rotation.from_euler('xyz', [0, 180, 0], degrees=True)
+    rot = Rotation.from_euler('xyz', [0, 90, 0], degrees=True)
 
     rot_quat = rot.as_quat()
 
-
     EndEfferctorId = nArmJoints-3
-    for j in range(240):
+    for j in range(600):
 
         p.stepSimulation(physicsClientId=physicsClient)
         out = p.getClosestPoints(armId,human_inst.body,10,EndEfferctorId)#5
@@ -234,8 +233,8 @@ def main():
             armparts.append(0)
             Forces.append(0)
         # Augment Path
-        pntsAndReturn[j%(2*traj_step),2] += 2*(out[0][6][2]-0.005)
-        pntsAndReturn[j%(2*traj_step),2] /= 3
+        pntsAndReturn[j%(2*traj_step),2] += 1*(out[0][6][2]-0.00)
+        pntsAndReturn[j%(2*traj_step),2] /= 2
 
 
         #time.sleep(TimeStep)
@@ -254,7 +253,7 @@ def main():
         # try hide arm with  changeVisualShape
         #print(cam)
         # every two seconds
-        if j%int(0.1/TimeStep):
+        if j%int(100/TimeStep):
             img_out = p.getCameraImage(Width, Height, cam_upview, cam_upproj)
             #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
 
@@ -272,70 +271,74 @@ def main():
 
             Depth2Show = nDepth * (mask==human_inst.body)
             last_dm[(mask==human_inst.body)] = Depth2Show[(mask==human_inst.body)]
+        if False:
+            Depth2Show = last_dm.copy()
 
-        Depth2Show = last_dm.copy()
+            Z_surface = Depth2Show[int(ImagArmPnt[1]),int(ImagArmPnt[0])]
 
-        Z_surface = Depth2Show[int(ImagArmPnt[1]),int(ImagArmPnt[0])]
+            #print(Z_surface)
+            #Depth2Show /= Depth2Show.max()
+            
+            #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
 
-        #print(Z_surface)
-        #Depth2Show /= Depth2Show.max()
-        
-        #img = np.array(img_out[2]).reshape(Height, Width,-1)[:,:,:3].astype(np.uint8)# RGBA
+            #cv2.imshow('img',((mask==human_inst.body)*255).astype(np.uint8))
+            # convert to RGB
+            if j:
+                Depth2Show[Depth2Show>0] -= (Depth2Show[Depth2Show>0]).min()
+                Depth2Show /= Depth2Show.max()
 
-        #cv2.imshow('img',((mask==human_inst.body)*255).astype(np.uint8))
-        # convert to RGB
-        if j:
-            Depth2Show[Depth2Show>0] -= (Depth2Show[Depth2Show>0]).min()
-            Depth2Show /= Depth2Show.max()
+            img = (Depth2Show*255).astype(np.uint8).astype(np.uint8)
+            img = np.dstack([np.zeros_like(img),np.zeros_like(img),img])
+            #img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            #print(ImagArmPnt[:2].flatten().astype(np.int32))
+            #print(f'Old Z: {pntsAndReturn[j%(2*traj_step)][2]}, New Z: {Z_surface}: diff {abs(pntsAndReturn[j%(2*traj_step)][2]-Z_surface)}')
 
-        img = (Depth2Show*255).astype(np.uint8).astype(np.uint8)
-        img = np.dstack([np.zeros_like(img),np.zeros_like(img),img])
-        #img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        #print(ImagArmPnt[:2].flatten().astype(np.int32))
-        #print(f'Old Z: {pntsAndReturn[j%(2*traj_step)][2]}, New Z: {Z_surface}: diff {abs(pntsAndReturn[j%(2*traj_step)][2]-Z_surface)}')
+            old_path.append(pntsAndReturn[j%(2*traj_step)][2])
+            new_path.append(Z_surface)
 
-        old_path.append(pntsAndReturn[j%(2*traj_step)][2])
-        new_path.append(Z_surface)
+            if Z_surface:
+                pass
+                #pntsAndReturn[j%(2*traj_step)][2] += Z_surface
+                #pntsAndReturn[j%(2*traj_step)][2] /= 2
 
-        if Z_surface:
-            pntsAndReturn[j%(2*traj_step)][2] += Z_surface
-            pntsAndReturn[j%(2*traj_step)][2] /= 2
+                #pntsAndReturn[j%(2*traj_step)][2] = np.clip(pntsAndReturn[j%(2*traj_step)][2],Z_surface-0.01,Z_surface+0.01) # 1 cm
+                #min(Z_surface,pntsAndReturn[j%(2*traj_step)][2])
 
-            pntsAndReturn[j%(2*traj_step)][2] = np.clip(pntsAndReturn[j%(2*traj_step)][2],Z_surface-0.01,Z_surface+0.01) # 1 cm
-            #min(Z_surface,pntsAndReturn[j%(2*traj_step)][2])
-
-        else:
-            new_path[-1] = pntsAndReturn[j%(2*traj_step)][2]
+            else:
+                new_path[-1] = pntsAndReturn[j%(2*traj_step)][2]
 
 
-        #print((PMat@np.array((-0.2828510, 0.12460, 0.6354567,1))))
+            #print((PMat@np.array((-0.2828510, 0.12460, 0.6354567,1))))
 
-        #breakpoint()
+            #breakpoint()
 
-        print(ImagArmPnt.T[0,:2],ArmLinkPnt.T[0,:2])
-        print(rot_quat)
-        cv2.circle(img,ImagArmPnt[:2].flatten().astype(np.int32),radius=4,color=(255,0,0),thickness=-1)
-        cv2.circle(img,ArmLinkPnt[:2].flatten().astype(np.int32),radius=4,color=(0,255,0),thickness=-1)
+            #print(ImagArmPnt.T[0,:2],ArmLinkPnt.T[0,:2])
+            #print(rot_quat)
+            #cv2.circle(img,ImagArmPnt[:2].flatten().astype(np.int32),radius=4,color=(255,0,0),thickness=-1)
+            #cv2.circle(img,ArmLinkPnt[:2].flatten().astype(np.int32),radius=4,color=(0,255,0),thickness=-1)
 
-        cv2.imshow('Depth Map',img)
-        cv2.waitKey(1)
+            #cv2.imshow('Depth Map',img)
+            #cv2.waitKey(1)
 
-        #states = p.getJointStates(armId,[0,1,2,3,4,5,6,7,8])
-        #print([state[0] for state in states])
+            #states = p.getJointStates(armId,[0,1,2,3,4,5,6,7,8])
+            #print([state[0] for state in states])
 
         # act
         # TODO taget orientation # we need only 3
         jointIndx = [1,2,3,4,5,6]
-        JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)],
-                                                       ))#rot_quat.tolist())) 
+        if j%2:
+            JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)],rot_quat.tolist())) 
+        else:
+            JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)]))
+                                                       
         p.setJointMotorControlArray(armId, jointIndices=jointIndx, controlMode=p.POSITION_CONTROL, 
                                     targetPositions=[JointPoses[j-1] for j in jointIndx],forces=100*np.ones_like(jointIndx))
-        print(JointPoses)
+        #print(JointPoses)
         if j%int(2/TimeStep):
             # Update Path
             p1,p2 = p.getAABB(human_inst.body)
             #pnts = generate_trajectory(np.array([p1[0]+0.125, 0.3, p2[2]-0.04]),np.array([p2[0]+0.1, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.035)
-            pnts = generate_trajectory(np.array([p1[0]+0.2, 0.3, p2[2]-0.04]),np.array([p2[0]+0.05, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.01)
+            pnts = generate_trajectory(np.array([p1[0]+0.0, 0.3, p2[2]+0.07]),np.array([p2[0]+0.05, 0.3, p2[2]+0.07]),numSamples=traj_step,frequency=6,amp=0.03)
             pntsAndReturn = np.vstack((pnts[::-1],pnts))
 
 
