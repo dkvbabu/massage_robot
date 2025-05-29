@@ -376,13 +376,14 @@ class MassageEnv:
             for contact in contact_points:
                 pos_ee = contact[5]
                 pos_human = contact[6]
-                print(
-                    f"Force: {contact[9]:.3f}, "
-                    f"Pos on ee_link: ({pos_ee[0]:.3f}, {pos_ee[1]:.3f}, {pos_ee[2]:.3f}), "
-                    f"Pos on human: ({pos_human[0]:.3f}, {pos_human[1]:.3f}, {pos_human[2]:.3f})"
-                )
+                #print(
+                #    f"Force: {contact[9]:.3f}, "
+                #    f"Pos on ee_link: ({pos_ee[0]:.3f}, {pos_ee[1]:.3f}, {pos_ee[2]:.3f}), "
+                #    f"Pos on human: ({pos_human[0]:.3f}, {pos_human[1]:.3f}, {pos_human[2]:.3f})"
+                #)
         else:
-            print(f"No contact at step {self.current_step}")
+            pass
+            #print(f"No contact at step {self.current_step}")
 
         visualize_contact(self.armId, self.human_inst.body, self.physicsClient)
         visualize_contact_points(self.armId, self.human_inst.body, self.physicsClient)
@@ -635,7 +636,8 @@ def run_td3_training(frequency, amplitude, x_offset, z_offset_lower, z_offset_up
     os.makedirs(save_dir, exist_ok=True)
     model_path = os.path.join(save_dir, 'td3_model.pth')
 
-    physicsClient = p.connect(p.GUI)
+    #physicsClient = p.connect(p.GUI)
+    physicsClient = p.connect(p.DIRECT)
     if physicsClient < 0:
         raise RuntimeError("Failed to connect to PyBullet GUI")
     print(f"Connected to PyBullet with client id: {physicsClient}")
@@ -715,18 +717,18 @@ def run_td3_training(frequency, amplitude, x_offset, z_offset_lower, z_offset_up
             state = env.reset()
             episode_reward = 0
             for step in range(max_steps_per_episode):
-                print(f"Episode {episode + 1} Step {step + 1} - before step_continuous")
+                #print(f"Episode {episode + 1} Step {step + 1} - before step_continuous")
                 action = agent.select_action(state)
                 noise = np.random.normal(0, max_action * 0.1, size=action_size)
                 action = (action + noise).clip(-max_action, max_action)
 
                 next_state, reward, done, reward_components = env.step_continuous(action)
-                print(f"Episode {episode + 1} Step {step + 1} - after step_continuous")
+                #print(f"Episode {episode + 1} Step {step + 1} - after step_continuous")
                 if isinstance(reward, (tuple, list, np.ndarray)):
                     print(f"Reward: {reward}, Done: {done}")
                 else:
                     print(f"Reward: {reward:.3f}, Done: {done}")
-                print(f"Reward components: {reward_components}")
+                #print(f"Reward components: {reward_components}")
 
                 agent.add_experience(state, action, reward, next_state, float(done))
                 agent.train()
@@ -798,21 +800,32 @@ def random_search_td3(env_params, search_iters=10):
             best_params = hyperparams
     return best_params, best_reward
 
+import csv
+import matplotlib.pyplot as plt
+import datetime
+import os
+import numpy as np
+import torch
+import pybullet as p
+import pybullet_data
+from torch.utils.tensorboard import SummaryWriter
+import seaborn as sns  # For enhanced plotting
 
 def run_td3_inference(frequency, amplitude, x_offset, z_offset_lower, z_offset_upper,
-                     region, force, traj_type, massage_technique,
-                     max_episodes=200, max_steps_per_episode=300,
-                     save_dir='models/td3', save_interval=20,
-                     hyperparams=None, load_model=False, log_dir=None):
+                      region, force, traj_type, massage_technique,
+                      max_episodes=10, max_steps_per_episode=100,
+                      save_dir='models/td3',
+                      hyperparams=None, load_model=True, log_dir=None):
     print("Starting TD3 inference...")
+
     if log_dir is None:
-        log_dir = f"runs/td3_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        log_dir = f"runs/td3_inference_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir)
 
     os.makedirs(save_dir, exist_ok=True)
     model_path = os.path.join(save_dir, 'td3_model.pth')
 
-    physicsClient = p.connect(p.GUI)
+    physicsClient = p.connect(p.DIRECT)
     print(f"Connected to PyBullet with client id: {physicsClient}")
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0, 0, -10)
@@ -855,56 +868,44 @@ def run_td3_inference(frequency, amplitude, x_offset, z_offset_lower, z_offset_u
 
     hidden_size = 256  # Use the hidden size used during training
     agent = TD3Agent(state_size, action_size, max_action, device=device, hidden_size=hidden_size)
-    print(f"Loading model from {model_path} ...")
-    agent.load(model_path)
+    if load_model:
+        print(f"Loading model from {model_path} ...")
+        agent.load(model_path)
 
-    state = env.reset()
-    print("Environment reset done.")
-
-    # Initialize missing variables
-    max_episodes = 10
-    max_steps_per_episode = 100
     episode_rewards = []
-    save_interval = 5
-    writer = SummaryWriter(log_dir=f"runs/inference_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    reward_components_history = []
+    max_episodes = 10
 
     try:
         for episode in range(max_episodes):
             print(f"Starting episode {episode + 1}/{max_episodes}")
             state = env.reset()
             episode_reward = 0
+            episode_reward_components = []
+
             for step in range(max_steps_per_episode):
-                print(f"Episode {episode + 1} Step {step + 1} - before step_continuous")
                 action = agent.select_action(state)
                 noise = np.random.normal(0, max_action * 0.1, size=action_size)
                 action = (action + noise).clip(-max_action, max_action)
 
                 next_state, reward, done, reward_components = env.step_continuous(action)
-                print(f"Episode {episode + 1} Step {step + 1} - after step_continuous")
 
                 if isinstance(reward, (tuple, list, np.ndarray)):
                     print(f"Reward: {reward}, Done: {done}")
                 else:
                     print(f"Reward: {reward:.3f}, Done: {done}")
 
-                print(f"Reward components: {reward_components}")
-
-                agent.add_experience(state, action, reward, next_state, float(done))
-                agent.train()
-
                 state = next_state
                 episode_reward += reward if not isinstance(reward, (tuple, list, np.ndarray)) else sum(reward)
+                episode_reward_components.append(reward_components)
 
                 if done:
                     print(f"Episode {episode + 1} finished after {step + 1} steps.")
                     break
 
             episode_rewards.append(episode_reward)
+            reward_components_history.append(episode_reward_components)
             writer.add_scalar('Reward', episode_reward, episode)
-
-            if (episode + 1) % save_interval == 0 or (episode + 1) == max_episodes:
-                print(f"Saving model at episode {episode + 1}")
-                agent.save(model_path)
 
             print(f"TD3 Episode {episode + 1}/{max_episodes} Reward: {episode_reward:.3f}")
 
@@ -914,6 +915,108 @@ def run_td3_inference(frequency, amplitude, x_offset, z_offset_lower, z_offset_u
     writer.close()
     p.disconnect()
     print("Disconnected from PyBullet. Inference finished.")
+
+    # --- Debug prints before aggregation ---
+    print("Starting aggregation and plotting...")
+    print(f"Number of episodes recorded: {len(episode_rewards)}")
+    print(f"Reward components history length: {len(reward_components_history)}")
+    if len(reward_components_history) > 0:
+        print(f"Sample reward components from first episode: {reward_components_history[0][:3]}")  # first 3 steps
+
+    # Aggregate and plot average reward components per episode
+    avg_components = {}
+    for episode_components in reward_components_history:
+        if not episode_components:
+            continue
+        keys = episode_components[0].keys()
+        avg = {k: 0.0 for k in keys}
+        for step_comp in episode_components:
+            for k in keys:
+                avg[k] += step_comp.get(k, 0.0)
+        for k in keys:
+            avg[k] /= len(episode_components)
+        for k, v in avg.items():
+            avg_components.setdefault(k, []).append(v)
+
+    # Plot total episode rewards and save/show
+    plt.figure(figsize=(10, 5))
+    plt.plot(episode_rewards, label='Episode Total Reward')
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.title('TD3 Inference Episode Rewards')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('td3_inference_episode_rewards.png')
+    plt.show()
+    plt.close()
+    print("Saved and displayed plot: td3_inference_episode_rewards.png")
+
+    # Plot average reward components and save/show
+    plt.figure(figsize=(10, 6))
+    for k, values in avg_components.items():
+        plt.plot(values, label=f'Avg {k}')
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward Component')
+    plt.title('Average Reward Components per Episode')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('td3_inference_avg_reward_components.png')
+    plt.show()
+    plt.close()
+    print("Saved and displayed plot: td3_inference_avg_reward_components.png")
+
+    # Reward distribution histogram save/show
+    plt.figure(figsize=(8, 5))
+    plt.hist(episode_rewards, bins=10, color='skyblue', edgecolor='black')
+    plt.xlabel('Total Episode Reward')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Total Episode Rewards')
+    plt.grid(True)
+    plt.savefig('td3_inference_reward_distribution.png')
+    plt.show()
+    plt.close()
+    print("Saved and displayed plot: td3_inference_reward_distribution.png")
+
+    # Cumulative reward curve save/show
+    cumulative_rewards = np.cumsum(episode_rewards)
+    plt.figure(figsize=(8, 5))
+    plt.plot(cumulative_rewards, marker='o', linestyle='-')
+    plt.xlabel('Episode')
+    plt.ylabel('Cumulative Reward')
+    plt.title('Cumulative Reward Over Episodes')
+    plt.grid(True)
+    plt.savefig('td3_inference_cumulative_reward.png')
+    plt.show()
+    plt.close()
+    print("Saved and displayed plot: td3_inference_cumulative_reward.png")
+
+    # Boxplot of average reward components save/show
+    plt.figure(figsize=(10, 6))
+    data_for_boxplot = [avg_components[k] for k in avg_components.keys()]
+    sns.boxplot(data=data_for_boxplot)
+    plt.xticks(ticks=range(len(avg_components)), labels=list(avg_components.keys()), rotation=45)
+    plt.ylabel('Average Reward Component Value')
+    plt.title('Boxplot of Average Reward Components per Episode')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig('td3_inference_reward_components_boxplot.png')
+    plt.show()
+    plt.close()
+    print("Saved and displayed plot: td3_inference_reward_components_boxplot.png")
+
+    # Save summary to CSV
+    csv_file = 'td3_inference_summary.csv'
+    with open(csv_file, mode='w', newline='') as f:
+        writer_csv = csv.writer(f)
+        header = ['Episode', 'TotalReward'] + list(avg_components.keys())
+        writer_csv.writerow(header)
+        for i in range(len(episode_rewards)):
+            row = [i + 1, episode_rewards[i]]
+            for k in avg_components.keys():
+                row.append(avg_components[k][i] if i < len(avg_components[k]) else '')
+            writer_csv.writerow(row)
+
+    print(f"Inference summary saved to {csv_file}")
 
 import tkinter as tk
 from tkinter import ttk
