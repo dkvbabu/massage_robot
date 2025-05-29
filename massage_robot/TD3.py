@@ -419,7 +419,7 @@ class MassageEnv:
 
         target_min, target_max = 15, 50
 
-        reward_contact = 0.5
+        reward_contact = 0.0
         reward_force = 0.0
         reward_penalty_force = 0.0
         reward_velocity_penalty = 0.0
@@ -427,6 +427,8 @@ class MassageEnv:
         reward_no_contact_penalty = 0.0
 
         if contact_points:
+            reward_contact = 0.5
+
             if target_min <= total_force <= target_max:
                 center = (target_min + target_max) / 2
                 width = (target_max - target_min) / 2
@@ -438,7 +440,7 @@ class MassageEnv:
             if total_force > target_max * 2:
                 reward_penalty_force = -2.0
         else:
-            reward_no_contact_penalty = -0.05
+            reward_no_contact_penalty = -0.05       
 
         joint_states = p.getJointStates(self.armId, self.joint_indices, physicsClientId=self.physicsClient)
         joint_velocities = np.array([state[1] for state in joint_states])
