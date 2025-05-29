@@ -24,7 +24,7 @@ from scipy.spatial.transform import Rotation
 
 
 
-def draw_data(Forces,armparts,bodyparts,old_path,new_path,actual_path):
+def draw_data(Forces,armparts,bodyparts,old_path,new_path,actual_path,eeId=7):
 
     # Show pressure Profile
     plt.subplot(411)
@@ -32,16 +32,16 @@ def draw_data(Forces,armparts,bodyparts,old_path,new_path,actual_path):
     plt.ylabel('Newton')
     plt.plot(Forces)
     plt.subplot(412)
-    plt.title('Arm Part')
+    plt.title(f'Arm Part: {np.round(np.mean([armid==eeId for armid in armparts]),2)*100}% End Effector')
     plt.plot(armparts)
     plt.subplot(413)
-    plt.title('Body Part')
+    plt.title(f'Body Part:  {np.round(np.mean([b==(-1) for b in bodyparts]),2)}')
     plt.plot(bodyparts)
     plt.subplot(414)
     plt.title('Massage Paths')
-    plt.plot(old_path,label='sinusoidal path')
-    plt.plot(new_path,label='surface level')
-    plt.plot(actual_path,label='modified path')
+    if len(old_path): plt.plot(old_path,label='sinusoidal commands')
+    if len(new_path): plt.plot(new_path,label='surface level')
+    if len(actual_path): plt.plot(actual_path,label='modified path')
     plt.ylabel('meters')
     plt.legend()
     plt.show()
@@ -194,8 +194,6 @@ def main():
     pntsAndReturn = np.vstack((pnts[::-1],pnts))
     print(f'Number of DOFs: {nArmJoints})')
 
-
-
     last_dm = np.zeros((Height,Width))
     #breakpoint()
     #print(p.getAABB(human_inst.body))
@@ -233,10 +231,10 @@ def main():
             armparts.append(0)
             Forces.append(0)
         # Augment Path
-        pntsAndReturn[j%(2*traj_step),2] += 1*(out[0][6][2]-0.00)
-        pntsAndReturn[j%(2*traj_step),2] /= 2
+        #pntsAndReturn[j%(2*traj_step),2] += (1*(out[0][6][2]-0.00))
+        #pntsAndReturn[j%(2*traj_step),2] /= 2
 
-
+        #pntsAndReturn[j%(2*traj_step),2] = max(pntsAndReturn[j%(2*traj_step),2],out[0][6][2]-0.005) + (5*Forces[-1]/10e4)
         #time.sleep(TimeStep)
         #print(f'Pnt: {pntsAndReturn[j%(2*traj_step)]}')
         ImagArmPnt = (PMat@(np.array(list(pntsAndReturn[j%(2*traj_step)])+[1])[:,None]))
@@ -326,7 +324,7 @@ def main():
         # act
         # TODO taget orientation # we need only 3
         jointIndx = [1,2,3,4,5,6]
-        if j%2:
+        if True:
             JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)],rot_quat.tolist())) 
         else:
             JointPoses = list(p.calculateInverseKinematics(armId, EndEfferctorId, pntsAndReturn[j%(2*traj_step)]))
@@ -338,7 +336,7 @@ def main():
             # Update Path
             p1,p2 = p.getAABB(human_inst.body)
             #pnts = generate_trajectory(np.array([p1[0]+0.125, 0.3, p2[2]-0.04]),np.array([p2[0]+0.1, 0.3, p2[2]-0.04]),numSamples=traj_step,frequency=6,amp=0.035)
-            pnts = generate_trajectory(np.array([p1[0]+0.0, 0.3, p2[2]+0.07]),np.array([p2[0]+0.05, 0.3, p2[2]+0.07]),numSamples=traj_step,frequency=6,amp=0.03)
+            pnts = generate_trajectory(np.array([p1[0]+0.0, 0.3, p2[2]+0.03]),np.array([p2[0]+0.05, 0.3, p2[2]+0.03]),numSamples=traj_step,frequency=6,amp=0.02)
             pntsAndReturn = np.vstack((pnts[::-1],pnts))
 
 
