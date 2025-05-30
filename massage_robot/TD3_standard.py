@@ -116,124 +116,55 @@ class InfoPrintCallback(BaseCallback):
 
 # --- Training function ---
 
+import os
+import numpy as np
+import torch
+from stable_baselines3 import TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.noise import NormalActionNoise
-from stable_baselines3 import TD3
-import numpy as np
-import os
-import torch
+from stable_baselines3.common.callbacks import CallbackList
 
-# Environment factory function
-def make_env(env_params):
-    def _init():
-        env = MassageEnvGym(**env_params)
-        return env
-    return _init
-
-# Early stopping callback based on mean reward threshold
-class EarlyStoppingCallback(BaseCallback):
-    def __init__(self, reward_threshold, check_freq, verbose=1):
-        super().__init__(verbose)
-        self.reward_threshold = reward_threshold
-        self.check_freq = check_freq
-        self.best_mean_reward = -np.inf
-
-    def _on_step(self) -> bool:
-        if self.n_calls % self.check_freq == 0:
-            episode_rewards = []
-            env = self.training_env
-            if hasattr(env, 'envs'):
-                env = env.envs[0]
-            while hasattr(env, 'env'):
-                env = env.env
-            if hasattr(env, 'get_episode_rewards'):
-                episode_rewards = env.get_episode_rewards()
-            if len(episode_rewards) > 0:
-                mean_reward = np.mean(episode_rewards[-100:])
-                if self.verbose > 0:
-                    print(f"Num timesteps: {self.num_timesteps}")
-                    print(f"Mean reward over last 100 episodes: {mean_reward:.2f}")
-                if mean_reward >= self.reward_threshold:
-                    if self.verbose > 0:
-                        print(f"Stopping training early as mean reward {mean_reward:.2f} >= threshold {self.reward_threshold}")
-                    return False  # Stop training
-        return True
-
-def run_td3_training(env_params, hyperparams=None, total_timesteps=100000, log_dir='td3_logs', reward_threshold=None):
+def run_td3_training(env_params, hyperparams=None, total_timesteps=50000, log_dir='td3_logs'):
     os.makedirs(log_dir, exist_ok=True)
 
-    env_fn = make_env(env_params)
+    # Create environment and wrap with Monitor and DummyVecEnv
+    env = MassageEnvGym(**env_params)
+    env = Monitor(env)
+    env = DummyVecEnv([lambda: env])
 
-    # Wrap raw env with Monitor first
-    def make_monitored_env():
-        return Monitor(env_fn())
-
-    # Then vectorize the monitored env
-    env = DummyVecEnv([make_monitored_env])
-
-    # Apply observation normalization and reward normalization with clipping
-    obs_norm = True
-    norm_reward = True
-    clip_reward = 10.0
-    if hyperparams:
-        obs_norm = hyperparams.get('obs_norm', True)
-        norm_reward = hyperparams.get('norm_reward', True)
-        clip_reward = hyperparams.get('clip_reward', 10.0)
-
-    if obs_norm or norm_reward:
-        env = VecNormalize(env, norm_obs=obs_norm, norm_reward=norm_reward, clip_obs=10., clip_reward=clip_reward)
+    # Apply observation normalization if requested
+    if hyperparams and hyperparams.get('obs_norm', False):
+        env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=10.)
 
     n_actions = env.action_space.shape[-1]
 
-    # Action noise sigma (increased to 0.7 for better exploration)
-    noise_sigma = 0.7
-    if hyperparams and 'policy_noise' in hyperparams:
-        noise_sigma = hyperparams['policy_noise']
+    # Action noise sigma from hyperparams or default
+    noise_sigma = hyperparams.get('policy_noise', 0.05) if hyperparams else 0.05
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=noise_sigma * np.ones(n_actions))
 
-    # Policy network architecture (larger network)
-    hidden_layers = [512, 512]
-    if hyperparams and 'hidden_layers' in hyperparams:
-        hidden_layers = hyperparams['hidden_layers']
+    # Policy network architecture
+    hidden_layers = hyperparams.get('hidden_layers', [256, 256]) if hyperparams else [256, 256]
     policy_kwargs = dict(net_arch=hidden_layers)
 
-    # Device selection
-    device = 'cpu'
-    if hyperparams and 'device' in hyperparams:
-        device = hyperparams['device']
+    # Device selection: use GPU if available and specified
+    device = hyperparams.get('device', 'cpu') if hyperparams else 'cpu'
     if device == 'cuda' and not torch.cuda.is_available():
         print("CUDA requested but not available, falling back to CPU.")
         device = 'cpu'
 
-    # Learning rates (default 1e-4)
-    actor_lr = 1e-4
-    critic_lr = 1e-4
-    if hyperparams:
-        actor_lr = hyperparams.get('actor_lr', actor_lr)
-        critic_lr = hyperparams.get('critic_lr', critic_lr)
-
-    # Batch size (default 256)
-    batch_size = 256
-    if hyperparams and 'batch_size' in hyperparams:
-        batch_size = hyperparams['batch_size']
-
-    # Gamma and tau
-    gamma = 0.99
-    tau = 0.005
-    if hyperparams:
-        gamma = hyperparams.get('gamma', gamma)
-        tau = hyperparams.get('tau', tau)
+    # Learning rates
+    actor_lr = hyperparams.get('actor_lr', 1e-3) if hyperparams else 1e-3
+    critic_lr = hyperparams.get('critic_lr', 1e-3) if hyperparams else 1e-3
 
     # Create TD3 model
     model = TD3("MlpPolicy", env,
                 action_noise=action_noise,
                 verbose=1,
                 tensorboard_log=log_dir,
-                batch_size=batch_size,
-                gamma=gamma,
-                tau=tau,
+                batch_size=hyperparams.get('batch_size', 128) if hyperparams else 128,
+                gamma=hyperparams.get('gamma', 0.99) if hyperparams else 0.99,
+                tau=hyperparams.get('tau', 0.005) if hyperparams else 0.005,
                 learning_rate=actor_lr,
                 policy_kwargs=policy_kwargs,
                 device=device)
@@ -242,28 +173,28 @@ def run_td3_training(env_params, hyperparams=None, total_timesteps=100000, log_d
     reward_callback = RewardLoggingCallback(check_freq=1000, log_dir=log_dir)
     best_model_callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
     info_print_callback = InfoPrintCallback()
+    callback = CallbackList([reward_callback, best_model_callback, info_print_callback])
 
-    callbacks = [reward_callback, best_model_callback, info_print_callback]
-
-    # Add early stopping callback if threshold specified
-    if reward_threshold is not None:
-        early_stop_cb = EarlyStoppingCallback(reward_threshold=reward_threshold, check_freq=1000)
-        callbacks.append(early_stop_cb)
-
-    callback = CallbackList(callbacks)
+    import traceback
 
     try:
         model.learn(total_timesteps=total_timesteps, callback=callback)
+    except Exception:
+        print("Error during training:")
+        print(traceback.format_exc())
+        raise
     finally:
         # Save VecNormalize statistics if used
-        if obs_norm or norm_reward:
+        if hyperparams and hyperparams.get('obs_norm', False):
             env.save(os.path.join(log_dir, 'vecnormalize.pkl'))
         env.close()
 
     model.save(os.path.join(log_dir, 'final_model'))
+
     print(f"Training completed. Model saved to {os.path.join(log_dir, 'final_model.zip')}")
 
     return model
+
 # --- Inference function with plots ---
 
 import matplotlib.pyplot as plt
@@ -420,21 +351,7 @@ import traceback
 def training_process(params, queue):
     try:
         print("Training process started")
-        hyperparams = {
-            'policy_noise': 0.7,
-            'obs_norm': True,
-            'norm_reward': True,
-            'clip_reward': 10.0,
-            'actor_lr': 1e-4,
-            'critic_lr': 1e-4,
-            'hidden_layers': [512, 512],
-            'batch_size': 256,
-            'gamma': 0.99,
-            'tau': 0.005,
-            'device': 'cpu'
-        }
-        model = run_td3_training(params['env_params'], hyperparams, total_timesteps=100000, log_dir='td3_logs', reward_threshold=90)
-        #model = run_td3_training(params['env_params'], params.get('hyperparams'), params.get('total_timesteps', 50000), params.get('log_dir', 'td3_logs'))
+        model = run_td3_training(params['env_params'], params.get('hyperparams'), params.get('total_timesteps', 50000), params.get('log_dir', 'td3_logs'))
         queue.put("Training completed")
     except Exception as e:
         tb_str = traceback.format_exc()
@@ -528,10 +445,10 @@ class TD3ControlApp:
             'z_offset_lower': 0.01,
             'z_offset_upper': 0.1,
             'region': 'lower_back',
-            'force_limit': 100,
+            'force_limit': 30,
             'traj_type': 'sine',
             'massage_technique': 'normal',
-            'max_steps': 50,
+            'max_steps': 300,
             'render': self.render_var.get()
         }
 
@@ -601,6 +518,9 @@ def evaluate_model(env, model, num_episodes=5):
         episode_rewards.append(total_reward)
     avg_reward = np.mean(episode_rewards)
     return avg_reward, episode_rewards
+
+import csv
+import os
 
 import os
 import csv
