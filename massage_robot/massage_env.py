@@ -332,6 +332,7 @@ class MassageEnvGym(gym.Env):
 
         next_state = self._get_state()
         reward = self._compute_reward()
+        print(f"Step {self.current_step}: action={action}, reward={reward}")
         done = self.current_step >= self.max_steps
 
         # Collect Forces, armparts, bodyparts from contact points
@@ -368,7 +369,7 @@ class MassageEnvGym(gym.Env):
         contact_points = p.getContactPoints(self.armId, self.human_inst.body, linkIndexA=7, physicsClientId=self.physicsClient)
         total_force = sum([cp[9] for cp in contact_points]) if contact_points else 0.0
 
-        target_min, target_max = 15, 50
+        target_min, target_max = 15, 100
 
         reward_contact = 0.3
         reward_force = 0.0
@@ -397,7 +398,13 @@ class MassageEnvGym(gym.Env):
         self.prev_joint_velocities = joint_velocities
 
         total_reward = reward_contact + reward_force + reward_penalty_force + reward_velocity_penalty + reward_no_contact_penalty
-        total_reward = max(min(total_reward, 1.0), -1.0)
+
+        # Scale reward to amplify learning signal
+        scale_factor = 10.0
+        total_reward *= scale_factor
+
+        # Optional: clip reward to avoid extreme values (comment out if unstable)
+        total_reward = max(min(total_reward, 10.0), -10.0)
 
         self.last_reward_components = {
             'reward_contact': reward_contact,
