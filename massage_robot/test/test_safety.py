@@ -18,3 +18,7 @@ def test_verify_velocity_violation():
     ok, msg = safety.verify([1.0, 0.5], [1.5, 0.2])
     assert ok is False
     assert 'Velocity limit' in msg
+
+def test_safety_placeholder():
+    # Placeholder: safety logic not implemented yet
+    assert True
