@@ -4,8 +4,10 @@ import torch.optim as optim
 import os
 import matplotlib.pyplot as plt
 from collections import deque
+import pybullet as p
 
-from TD3_train import MassageEnv, Actor, Critic, ReplayBuffer, TD3  # Assuming these are in TD3_train.py
+from env import MassageEnv  # Import your environment class from env.py
+from TD3_train import Actor, Critic, ReplayBuffer, TD3, local_step, local_reset, get_action_bounds  # Import other classes and functions
 
 
 def hyperparameter_tuning():
@@ -24,12 +26,8 @@ def hyperparameter_tuning():
     all_avg_critic_losses = []
     all_param_sets = []
 
-    # Early stopping parameters
-    min_avg_reward_threshold = 50.0  # stop if avg reward below this after min_episodes
-    min_episodes_before_stop = 5  # minimum episodes before checking early stop
-
-    # Adaptive threshold window size
-    loss_window_size = 5
+    episodes = 10
+    start_timesteps = 300
 
     for lr in learning_rates:
         for batch_size in batch_sizes:
@@ -42,7 +40,8 @@ def hyperparameter_tuning():
                                       f"policy_noise={policy_noise}, noise_clip={noise_clip}, policy_freq={policy_freq}")
 
                                 env = MassageEnv(render=False)
-                                state_dim = len(env.get_state())
+                                stats = env.collect_stats()
+                                state_dim = len(env.get_state(stats))
                                 action_dim = 3
                                 max_action = 1.0
 
@@ -57,44 +56,77 @@ def hyperparameter_tuning():
 
                                 replay_buffer = ReplayBuffer()
 
-                                episodes = 10
-                                episode_length = 5 * env.PointsInPath
-                                start_timesteps = 1000
+                                episode_length = 1440
                                 total_steps = 0
                                 episode_rewards = []
                                 actor_losses = []
                                 critic_losses = []
 
-                                min_bounds, max_bounds = env.get_action_bounds(margin=0.05)
+                                min_bounds, max_bounds = get_action_bounds(env, margin=0)
+
+                                alpha = 0.01  # smoothing factor for interpolation
+                                prev_action = np.zeros(action_dim)
+                                smooth_target_prev = None
 
                                 early_stop = False
 
-                                # Deques for adaptive thresholding
-                                recent_critic_losses = deque(maxlen=loss_window_size)
-                                recent_actor_losses = deque(maxlen=loss_window_size)
-
                                 for episode in range(episodes):
-                                    env.reset()
-                                    state = env.get_state()
+                                    local_reset(env)
+                                    env.make_path()
+                                    stats = env.collect_stats()
+                                    state = env.get_state(stats)
+                                    state = state / np.linalg.norm(state) if np.linalg.norm(state) > 0 else state
+
                                     episode_reward = 0
 
                                     for t in range(episode_length):
-                                        if total_steps < start_timesteps:
-                                            base_action = env.get_action()
-                                            noise = np.random.normal(0, 0.1, size=base_action.shape)
-                                            action = base_action + noise
+                                        # Disable collisions for all arm links except end effector and link 7
+                                        for link_idx in range(p.getNumJoints(env.armId)):
+                                            if link_idx not in [env.EndEfferctorId, 7]:
+                                                p.setCollisionFilterPair(env.armId, env.human_inst.body, link_idx, -1, enableCollision=0, physicsClientId=env.SimID)
+
+                                        action = agent.select_action(state)
+                                        action = action + np.random.normal(0, 0.1, size=action_dim)
+
+                                        workspace_range = max_bounds - min_bounds
+                                        action = min_bounds + (action + 1) / 2 * workspace_range
+
+                                        # Oscillate x target back and forth
+                                        x_min = np.min(env.pntsAndReturn[:, 0])
+                                        x_max = np.max(env.pntsAndReturn[:, 0])
+                                        x_range = x_max - x_min
+                                        oscillation_period = episode_length / 2
+                                        x_oscillate = x_min + (x_range / 2) * (1 + np.sin(2 * np.pi * t / oscillation_period))
+
+                                        y_fixed = 0.3
+                                        z_fixed = 0.95
+
+                                        action[0] = x_oscillate
+                                        action[1] = y_fixed  # fixed y since min and max are equal
+                                        action[2] = np.clip(action[2], z_fixed - 0.05, z_fixed + 0.05)
+
+                                        # Smooth action blending
+                                        action_smooth = 0.8 * prev_action + 0.2 * action
+                                        prev_action = action_smooth
+
+                                        # Smooth target interpolation
+                                        if smooth_target_prev is None:
+                                            smooth_target = action_smooth
                                         else:
-                                            action = agent.select_action(state)
-                                            action = action + np.random.normal(0, 0.1, size=action_dim)
+                                            smooth_target = alpha * action_smooth + (1 - alpha) * smooth_target_prev
+                                        smooth_target_prev = smooth_target
+                                        smooth_target = np.clip(smooth_target, min_bounds, max_bounds)
 
-                                        action = np.clip(action, min_bounds, max_bounds)
+                                        local_step(env, smooth_target)
 
-                                        env.step(action)
-                                        next_state = env.get_state()
-                                        reward = env.get_reward()
+                                        stats = env.collect_stats()
+                                        next_state = env.get_state(stats)
+                                        next_state = next_state / np.linalg.norm(next_state) if np.linalg.norm(next_state) > 0 else next_state
+
+                                        reward = env.get_reward(stats)
                                         done = (t == episode_length - 1)
 
-                                        replay_buffer.add((state, action, reward, next_state, float(done)))
+                                        replay_buffer.add((state, smooth_target, reward, next_state, float(done)))
 
                                         state = next_state
                                         episode_reward += reward
@@ -104,42 +136,17 @@ def hyperparameter_tuning():
                                             actor_loss, critic_loss = agent.train(replay_buffer, batch_size)
                                             if actor_loss is not None:
                                                 actor_losses.append(actor_loss)
-                                                recent_actor_losses.append(actor_loss)
-                                            critic_losses.append(critic_loss)
-                                            recent_critic_losses.append(critic_loss)
+                                                critic_losses.append(critic_loss)
 
-                                            # Adaptive threshold check for critic loss
-                                            if len(recent_critic_losses) == loss_window_size:
-                                                mean_critic = np.mean(recent_critic_losses)
-                                                std_critic = np.std(recent_critic_losses)
-                                                upper_critic_threshold = mean_critic + 2 * std_critic
-                                                if critic_loss > upper_critic_threshold:
-                                                    print(f"Early stopping: Critic loss {critic_loss:.3f} exceeded adaptive threshold "
-                                                          f"{upper_critic_threshold:.3f} at episode {episode+1}")
-                                                    early_stop = True
-                                                    break
-
-                                            # Adaptive threshold check for actor loss (optional)
-                                            if actor_loss is not None and len(recent_actor_losses) == loss_window_size:
-                                                mean_actor = np.mean(recent_actor_losses)
-                                                std_actor = np.std(recent_actor_losses)
-                                                lower_actor_threshold = mean_actor - 2 * std_actor
-                                                if actor_loss < lower_actor_threshold:
-                                                    print(f"Warning: Actor loss {actor_loss:.3f} below adaptive lower threshold "
-                                                          f"{lower_actor_threshold:.3f} at episode {episode+1}")
-                                                    # Optional: early_stop = True
-
-                                        if done or early_stop:
+                                        if done:
                                             break
 
                                     episode_rewards.append(episode_reward)
                                     print(f"Episode {episode + 1}, Reward: {episode_reward:.3f}")
 
-                                    if episode + 1 >= min_episodes_before_stop:
-                                        avg_reward_so_far = np.mean(episode_rewards)
-                                        if avg_reward_so_far < min_avg_reward_threshold:
-                                            print(f"Early stopping: Average reward {avg_reward_so_far:.3f} below threshold at episode {episode+1}")
-                                            early_stop = True
+                                    if episode_rewards and np.mean(episode_rewards[-5:]) < 50.0:
+                                        print(f"Early stopping: Average reward below threshold at episode {episode+1}")
+                                        early_stop = True
 
                                     if early_stop:
                                         break
@@ -189,9 +196,6 @@ def hyperparameter_tuning():
             best_score = score
             best_params = all_param_sets[i]
             best_index = i
-
-    # Load and save best model weights again if needed (optional)
-    # You can reload the best model here if you saved checkpoints during tuning
 
     print("\nHyperparameter tuning completed.")
     print(f"Best combined score: {best_score:.4f}")
