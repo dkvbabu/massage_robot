@@ -26,254 +26,7 @@ import torch.optim as optim
 from collections import deque
 import random
 from torch.utils.tensorboard import SummaryWriter
-
-class MassageEnv():
-    def __init__(self, render=False):
-        self.SimID = p.connect([p.DIRECT, p.GUI][render])
-        
-        p.setAdditionalSearchPath(pybullet_data.getDataPath())
-
-        p.setGravity(0, 0, -10)
-        startPos = [-0.8, 0.1, 1.0]
-        cubeStartingPose = [-1.3, 0.0, 0.5]
-        self.EErot = p.getQuaternionFromEuler([0, 90, 0])
-        startOrientation = p.getQuaternionFromEuler([0, 0, 0])
-
-        planeId = p.loadURDF("plane.urdf")
-        cubeId = p.loadURDF("cube.urdf", cubeStartingPose, startOrientation)
-        self.armId = p.loadURDF('urdf/ur5_robot.urdf', startPos, startOrientation)
-
-        self.TimeStep = 1 / 24.0
-        p.setTimeStep(self.TimeStep)
-
-        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
-        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-
-        self.human_inst = load_scene(self.SimID)
-        pos, orn = p.getBasePositionAndOrientation(self.human_inst.body)
-        print(f"Human position: {pos}")
-        print(f"Human orientation: {orn}")
-        
-        self.nArmJoints = p.getNumJoints(self.armId, physicsClientId=self.SimID)
-        self.EndEfferctorId = self.nArmJoints - 3
-        for link_idx in range(p.getNumJoints(self.armId)):
-            if link_idx != self.EndEfferctorId:
-                p.setCollisionFilterPair(self.armId, self.human_inst.body, link_idx, -1, enableCollision=0, physicsClientId=self.SimID)
-
-        
-        self.PointsInPath = 100
-        self.controlledJoints = [1, 2, 3, 4, 5, 6]
-        self.baseLevel = 0.02
-
-        p.resetDebugVisualizerCamera(cameraYaw=92.4, cameraPitch=-41.8, cameraDistance=1.0,
-                                     cameraTargetPosition=(-0.4828510, 0.12460, 0.6354567), )
-
-        self.make_path()  # Generate path once here
-
-        self.reset()
-        self.timestep = 0
-
-    def reset(self):
-        # Reset human position and orientation to fixed values
-        fixed_pos = (-0.15, 0.2, 0.95)
-        fixed_orn = (4.329780281177466e-17, 0.7071067811865476, 0.7071067811865475, -4.329780281177466e-17)
-        p.resetBasePositionAndOrientation(self.human_inst.body, fixed_pos, fixed_orn)
-
-        # Reset robot joints to initial angles
-        initial_joint_angles = [-0.4, -0.9, 1, -2.0, -1.5, 0.0]
-        for joint_index, angle in zip(self.controlledJoints, initial_joint_angles):
-            p.resetJointState(self.armId, joint_index, angle, targetVelocity=0.0)
-
-        # Reset tracking variables
-        self.Forces = []
-        self.bodyparts = []
-        self.armparts = []
-
-        self.old_path = []
-        self.new_path = []
-        self.actual_path = []
-
-        # Do NOT call make_path() here to keep path fixed
-
-    def make_path(self):
-        # Generate trajectory points along human back (x-axis)
-        p1, p2 = p.getAABB(self.human_inst.body)
-        pnts = generate_trajectory(np.array([p1[0], 0.3, p2[2] + self.baseLevel]),
-                                   np.array([p2[0], 0.3, p2[2] + self.baseLevel]),
-                                   numSamples=self.PointsInPath,
-                                   frequency=6, amp=0.02)
-        self.pntsAndReturn = np.vstack((pnts[::-1], pnts))
-
-    def get_current_target(self):
-        # Return current target point on path based on timestep
-        return self.pntsAndReturn[(self.timestep % (2 * self.PointsInPath))]
-
-    def get_action(self, change=0):
-        # Heuristic action: target point on path
-        return self.get_current_target()
-
-    def step(self, action):
-        
-        JointPoses = list(p.calculateInverseKinematics(self.armId, self.EndEfferctorId, action, self.EErot))
-
-        p.setJointMotorControlArray(self.armId, jointIndices=self.controlledJoints, controlMode=p.POSITION_CONTROL,
-                                    targetPositions=[JointPoses[j - 1] for j in self.controlledJoints],
-                                    forces=50 * np.ones_like(self.controlledJoints))
-        
-        # # Reset human position and orientation to fixed values
-        # fixed_pos = (-0.15, 0.2, 0.95)
-        # fixed_orn = (4.329780281177466e-17, 0.7071067811865476, 0.7071067811865475, -4.329780281177466e-17)
-        # p.resetBasePositionAndOrientation(self.human_inst.body, fixed_pos, fixed_orn)
-
-
-        p.stepSimulation(physicsClientId=self.SimID)
-
-        self.collect_stats()
-
-        self.timestep += 1
-
-        if (self.timestep%(self.PointsInPath*2))==0:
-            self.make_path()
-
-
-    def collect_stats(self):
-        out_1 = p.getContactPoints(self.armId, self.human_inst.body)
-
-        if len(out_1):
-            self.bodyparts.append(out_1[0][4])
-            self.armparts.append(out_1[0][3])
-            self.Forces.append(out_1[0][9])
-        else:
-            self.bodyparts.append(0)
-            self.armparts.append(0)
-            self.Forces.append(0)
-
-        com_pose, com_orient, _, _, _, _ = p.getLinkState(self.armId, self.EndEfferctorId)
-        self.actual_path.append(com_pose[-1])
-
-        self.old_path.append(self.pntsAndReturn[(self.timestep % (2 * self.PointsInPath))][2])
-
-    def close(self):
-        p.disconnect()
-        draw_data(self.Forces, self.armparts, self.bodyparts,
-                  old_path=self.old_path, new_path=self.new_path, actual_path=self.actual_path)
-
-    # Updated get_state method in MassageEnv class
-    def get_state(self):
-        # Raw joint angles
-        joint_states = [p.getJointState(self.armId, j)[0] for j in self.controlledJoints]
-
-        # Normalize joint angles assuming range ~[-pi, pi]
-        normalized_joint_states = [angle / np.pi for angle in joint_states]
-
-        # Raw end effector position
-        ee_pos, _ = p.getLinkState(self.armId, self.EndEfferctorId)[:2]
-
-        # Normalize end effector position assuming workspace ~[-1,1] meters
-        normalized_ee_pos = [coord / 1.0 for coord in ee_pos]
-
-        # Normalized timestep
-        timestep_norm = self.timestep / 200.0
-
-        # Current target position (assumed in same scale as ee_pos)
-        target_pos = self.get_current_target()
-        normalized_target_pos = [coord / 1.0 for coord in target_pos]
-
-        # Contact info
-        contact_points = p.getContactPoints(self.armId, self.human_inst.body, physicsClientId=self.SimID)
-        normal_forces = [cp[9] for cp in contact_points]
-        normal_vectors = [cp[7] for cp in contact_points]
-        total_normal_force = sum(normal_forces) if normal_forces else 0.0
-        if normal_vectors:
-            avg_normal_vector = np.mean(np.array(normal_vectors), axis=0)
-        else:
-            avg_normal_vector = np.array([0.0, 0.0, 0.0])
-        num_contacts = len(contact_points)
-
-        # Construct normalized state vector
-        state = np.array(
-            normalized_joint_states +
-            normalized_ee_pos +
-            [timestep_norm] +
-            normalized_target_pos +
-            [total_normal_force] +
-            list(avg_normal_vector) +
-            [num_contacts],
-            dtype=np.float32
-        )
-
-        return state
-        
-    def get_reward(self):
-        contact_points = p.getContactPoints(self.armId, self.human_inst.body, physicsClientId=self.SimID)
-
-        # Separate contacts by link index on the arm side
-        end_effector_contacts = [cp for cp in contact_points if cp[3] == 7]  # linkIndexA == 7 is end effector
-        other_contacts = [cp for cp in contact_points if cp[3] != 7]
-
-        # Sum forces for end effector contacts only
-        total_force = sum([cp[9] for cp in end_effector_contacts]) if end_effector_contacts else 0.0
-
-        target_min, target_max = 15, 50
-
-        reward_contact = 0.0
-        reward_force = 0.0
-        reward_penalty_force = 0.0
-        reward_wrong_contact_penalty = 0.0
-        reward_no_contact_penalty = 0.0
-        
-        # Penalize any contact from links other than end effector
-        if other_contacts:
-            reward_wrong_contact_penalty = -1.0  # Strong penalty for wrong contact
-
-        if end_effector_contacts:
-            reward_contact = 0.5
-
-            if target_min <= total_force <= target_max:
-                center = (target_min + target_max) / 2
-                width = (target_max - target_min) / 2
-                reward_force = 1.0 - abs(total_force - center) / width
-            else:
-                dist = min(abs(total_force - target_min), abs(total_force - target_max))
-                reward_force = -dist / target_max * 0.5
-
-            if total_force > target_max * 2:
-                reward_penalty_force = -2.0
-        else:
-            reward_no_contact_penalty = -0.05
-
-        # print('rewardcontact', reward_contact)
-        # print('rewardforce', reward_force)
-        # print('rewardpenaltyforce', reward_penalty_force)
-        # print('rewardnocontact', reward_no_contact_penalty)
-        # print('rewardwrongcontact', reward_wrong_contact_penalty)
-
-        total_reward = (reward_contact + reward_force +
-                        reward_penalty_force + reward_wrong_contact_penalty +
-                        reward_no_contact_penalty)
-        total_reward = max(min(total_reward, 1.0), -1.0)
-
-        return total_reward
-
-    
-    def get_current_target(self):
-        max_index = 2 * self.PointsInPath - 1
-        idx = min(self.timestep, max_index)
-        return self.pntsAndReturn[idx]
-    
-    def get_action_bounds(self, margin=0):
-        min_bounds = np.min(self.pntsAndReturn, axis=0) - margin
-        max_bounds = np.max(self.pntsAndReturn, axis=0) + margin
-        # print('minbounds',min_bounds) 
-        # print('maxbounds',max_bounds) 
-        # Ensure x-axis minimum bound is not negative
-        if min_bounds[0] < 0 and  min_bounds[0] < -0.3:
-            min_bounds[0] = -0.3    
-        
-        if min_bounds[2] > 0 and  min_bounds[2] > 1.06:
-            min_bounds[2] = 1.06              
-
-        return min_bounds, max_bounds
+from env import MassageEnv  # import the environment from env.py
 
 # Updated Actor class
 class Actor(nn.Module):
@@ -359,7 +112,13 @@ class TD3:
         self.total_it = 0
 
     def select_action(self, state):
-        state = torch.FloatTensor(state.reshape(1, -1))
+        if isinstance(state, np.ndarray):
+            state = torch.FloatTensor(state).unsqueeze(0)  # shape (1, state_dim)
+        elif isinstance(state, torch.Tensor):
+            if state.dim() == 1:
+                state = state.unsqueeze(0)
+        else:
+            raise TypeError("State must be numpy array or torch tensor")
         return self.actor(state).cpu().data.numpy().flatten()
 
     def train(self, replay_buffer, batch_size=100):
@@ -399,16 +158,112 @@ class TD3:
 
 import matplotlib.pyplot as plt
 
+def get_action_bounds(env, margin=0):
+    min_bounds = np.min(env.pntsAndReturn, axis=0) - margin
+    max_bounds = np.max(env.pntsAndReturn, axis=0) + margin
+    print('minbounds',min_bounds) 
+    print('maxbounds',max_bounds) 
+    # Ensure x-axis minimum bound is not negative
+    # if min_bounds[0] < 0 and  min_bounds[0] < -0.3:
+    #     min_bounds[0] = -0.3    
+    
+    # if min_bounds[2] > 0 and  min_bounds[2] > 1.06:
+    #     min_bounds[2] = 1.06              
+
+    return min_bounds, max_bounds
+
+def local_reset(env):
+    # Reset human position and orientation to fixed values
+    fixed_pos = (-0.15, 0.2, 0.95)
+    fixed_orn = (4.329780281177466e-17, 0.7071067811865476, 0.7071067811865475, -4.329780281177466e-17)
+    p.resetBasePositionAndOrientation(env.human_inst.body, fixed_pos, fixed_orn)
+
+    # Reset robot joints to initial angles
+    initial_joint_angles = [-0.4, -0.9, 1, -2.0, -1.5, 0.0]
+    for joint_index, angle in zip(env.controlledJoints, initial_joint_angles):
+        p.resetJointState(env.armId, joint_index, angle, targetVelocity=0.0)
+
+    # Reset tracking variables
+    env.Forces = []
+    env.bodyparts = []
+    env.armparts = []
+
+    env.old_path = []
+    env.new_path = []
+    env.actual_path = []
+
+    # Do NOT call make_path() here to keep path fixed
+
+def local_step(env, action):
+    max_z = 1.14  # Set your max z bound here (adjust as needed)
+    
+    # Clip the z-axis coordinate of the target position
+    clipped_action = list(action)
+    clipped_action[2] = min(clipped_action[2], max_z)
+    
+    JointPoses = list(p.calculateInverseKinematics(env.armId, env.EndEfferctorId, action, env.EErot))
+    
+    p.setJointMotorControlArray(env.armId, jointIndices=env.controlledJoints, controlMode=p.POSITION_CONTROL,
+                                targetPositions=[JointPoses[j - 1] for j in env.controlledJoints],
+                                forces=50 * np.ones_like(env.controlledJoints))
+    
+    p.stepSimulation(physicsClientId=env.SimID)
+    
+    env.collect_stats()
+    
+    env.timestep += 1
+    
+    if (env.timestep % (env.PointsInPath * 2)) == 0:
+        env.make_path()    
+
+def print_end_effector_contacts(env):
+    contacts = p.getContactPoints(bodyA=env.armId, bodyB=env.human_inst.body,
+                                  linkIndexA=env.EndEfferctorId, physicsClientId=env.SimID)
+    if contacts:
+        print(f"Contacts on end effector (link {env.EndEfferctorId}):")
+        for c in contacts:
+            contact_pos = c[5]  # contact position on robot link
+            contact_force = c[9]  # normal force
+            print(f"  Contact point: {contact_pos}, Force: {contact_force:.4f}")
+    else:
+        print("No contacts on end effector.")
+
+def verify_collision_filters(env):
+    print("Collision filter status (0=disabled, 1=enabled) between robot links and human:")
+    for link_idx in range(p.getNumJoints(env.armId)):
+        status = p.getCollisionFilterPair(env.armId, env.human_inst.body, link_idx, -1, physicsClientId=env.SimID)
+        print(f"  Link {link_idx}: {'Enabled' if status else 'Disabled'}")
+
+def check_all_link_contacts(env):
+    print("Checking contacts between robot links and human:")
+    for link_idx in range(p.getNumJoints(env.armId)):
+        contacts = p.getContactPoints(bodyA=env.armId, bodyB=env.human_inst.body,
+                                      linkIndexA=link_idx, physicsClientId=env.SimID)
+        if contacts:
+            print(f"  Contacts on link {link_idx}:")
+            for c in contacts:
+                contact_pos = c[5]
+                contact_force = c[9]
+                print(f"    Contact point: {contact_pos}, Force: {contact_force:.4f}")        
+
 def train_td3():
     writer = SummaryWriter(log_dir="./runs/td3_training")
-    # When initializing the agent, get the updated state_dim from get_state()
-    env = MassageEnv(render=False)
-    state_dim = len(env.get_state())  # This will now include the 5 new features
+    env = MassageEnv(render=False)  # Use env.py's MassageEnv
+
+    # Disable collisions for all arm links except end effector
+    for link_idx in range(p.getNumJoints(env.armId)):
+        if link_idx not in [env.EndEfferctorId, 7]:
+            p.setCollisionFilterPair(env.armId, env.human_inst.body, link_idx, -1, enableCollision=0, physicsClientId=env.SimID)
+
+    check_all_link_contacts(env)
+    stats = env.collect_stats()
+    state_dim = len(env.get_state(stats))
+    print(f"Updated state dimension: {state_dim}")
+
     action_dim = 3
     max_action = 1.0
     agent = TD3(state_dim, action_dim, max_action)
 
-    # Best hyperparameters from tuning
     best_params = {
         'learning_rate': 0.001,
         'batch_size': 256,
@@ -419,7 +274,6 @@ def train_td3():
         'policy_freq': 2
     }
 
-    # Override default optimizers and parameters with best hyperparameters
     agent.actor_optimizer = torch.optim.Adam(agent.actor.parameters(), lr=best_params['learning_rate'])
     agent.critic_optimizer = torch.optim.Adam(agent.critic.parameters(), lr=best_params['learning_rate'])
     agent.discount = best_params['discount']
@@ -431,12 +285,11 @@ def train_td3():
     replay_buffer = ReplayBuffer()
 
     episodes = 100
-    episode_length = 1 * env.PointsInPath  # Full path length, no looping
+    episode_length = 1440
     batch_size = best_params['batch_size']
-    start_timesteps = 500  # Steps before training starts
+    start_timesteps = 300
 
     total_steps = 0
-
     save_dir = "./models"
     os.makedirs(save_dir, exist_ok=True)
 
@@ -444,37 +297,82 @@ def train_td3():
     actor_losses = []
     critic_losses = []
 
+    alpha = 0.01  # smoothing factor for interpolation
+    prev_action = np.zeros(action_dim)
+    smooth_target_prev = None
+
+    all_Forces = []
+    all_bodyparts = []
+    all_armparts = []
+    all_old_path = []
+    all_new_path = []
+    all_actual_path = []
+
     for episode in range(episodes):
-        env.reset()
-        # Get midpoint of human back path
-        mid_index = len(env.pntsAndReturn) // 2
-        origin_pos = env.pntsAndReturn[mid_index]  # [x, y, z]
+        local_reset(env)
+        env.make_path()
+        stats = env.collect_stats()
+        state = env.get_state(stats)
+        print(f"Initial state length: {len(state)}")
 
-        axis_length = 0.2
+        state = state / np.linalg.norm(state) if np.linalg.norm(state) > 0 else state
 
-        # Draw axes at origin_pos
-        p.addUserDebugLine(origin_pos, origin_pos + [axis_length, 0, 0], [1, 0, 0], lineWidth=3)  # X axis red
-        p.addUserDebugLine(origin_pos, origin_pos + [0, axis_length, 0], [0, 1, 0], lineWidth=3)  # Y axis green
-        p.addUserDebugLine(origin_pos, origin_pos + [0, 0, axis_length], [0, 0, 1], lineWidth=3)  # Z axis blue
+        min_bounds, max_bounds = get_action_bounds(env, margin=0)
+        print(f"TD3 action bounds: min {min_bounds}, max {max_bounds}")
 
-        state = env.get_state()
         episode_reward = 0
 
-        min_bounds, max_bounds = env.get_action_bounds()
-        #print("Action bounds:", min_bounds, max_bounds)
-
         for t in range(episode_length):
+            # Disable collisions for all arm links except end effector
+            for link_idx in range(p.getNumJoints(env.armId)):
+                if link_idx not in [env.EndEfferctorId, 7]:
+                    p.setCollisionFilterPair(env.armId, env.human_inst.body, link_idx, -1, enableCollision=0, physicsClientId=env.SimID)
             action = agent.select_action(state)
-            action = (action + np.random.normal(0, 0.1, size=action_dim))
-            action = np.clip(action, min_bounds, max_bounds)
+            action = action + np.random.normal(0, 0.1, size=action_dim)
 
-            env.step(action)
-            next_state = env.get_state()
+            workspace_range = max_bounds - min_bounds
+            action = min_bounds + (action + 1) / 2 * workspace_range
 
-            reward = env.get_reward()
+            # Oscillate x target back and forth
+            x_min = np.min(env.pntsAndReturn[:, 0])
+            x_max = np.max(env.pntsAndReturn[:, 0])
+            x_range = x_max - x_min
+            oscillation_period = episode_length / 2
+            x_oscillate = x_min + (x_range / 2) * (1 + np.sin(2 * np.pi * t / oscillation_period))
+
+            y_fixed = 0.3
+            z_fixed = 0.95
+
+            action[0] = x_oscillate
+            action[1] = y_fixed  # fixed y since min and max are equal
+            action[2] = np.clip(action[2], z_fixed - 0.05, z_fixed + 0.05)
+
+            # Smooth action blending
+            action_smooth = 0.8 * prev_action + 0.2 * action
+            prev_action = action_smooth
+
+            # Smooth target interpolation
+            if smooth_target_prev is None:
+                smooth_target = action_smooth
+            else:
+                smooth_target = alpha * action_smooth + (1 - alpha) * smooth_target_prev
+            smooth_target_prev = smooth_target
+            smooth_target = np.clip(smooth_target, min_bounds, max_bounds)
+            
+            local_step(env, smooth_target)
+
+            ee_pos, _ = p.getLinkState(env.armId, env.EndEfferctorId, physicsClientId=env.SimID)[:2]
+            #print(f"Step {t}: End Effector Position - x: {ee_pos[0]:.3f}, y: {ee_pos[1]:.3f}, z: {ee_pos[2]:.3f}")
+            stats = env.collect_stats()
+            
+            next_state = env.get_state(stats)
+            next_state = next_state / np.linalg.norm(next_state) if np.linalg.norm(next_state) > 0 else next_state
+            stats = env.collect_stats()
+            
+            reward = env.get_reward(stats)
             done = (t == episode_length - 1)
-
-            replay_buffer.add((state, action, reward, next_state, float(done)))
+            
+            replay_buffer.add((state, smooth_target, reward, next_state, float(done)))
 
             state = next_state
             episode_reward += reward
@@ -494,15 +392,36 @@ def train_td3():
         print(f"Episode {episode + 1}, Reward: {episode_reward:.3f}")
         writer.add_scalar('Reward/Episode', episode_reward, episode)
 
-        # Save model every 50 episodes (adjust as needed)
-        if (episode + 1) % 50 == 0:
+        all_Forces.extend(env.Forces)
+        all_bodyparts.extend(env.bodyparts)
+        all_armparts.extend(env.armparts)
+        all_old_path.extend(env.old_path)
+        all_new_path.extend(env.new_path)
+        all_actual_path.extend(env.actual_path)
+
+        if (episode + 1) % 100 == 0:
+            draw_data(
+                all_Forces,
+                all_armparts,
+                all_bodyparts,
+                old_path=all_old_path,
+                new_path=all_new_path,
+                actual_path=all_actual_path
+            )
+            all_Forces.clear()
+            all_bodyparts.clear()
+            all_armparts.clear()
+            all_old_path.clear()
+            all_new_path.clear()
+            all_actual_path.clear()
+
+        if (episode + 1) % 100 == 0:
             actor_path = os.path.join(save_dir, f"actor_episode_{episode+1}.pth")
             critic_path = os.path.join(save_dir, f"critic_episode_{episode+1}.pth")
             torch.save(agent.actor.state_dict(), actor_path)
             torch.save(agent.critic.state_dict(), critic_path)
             print(f"Saved models at episode {episode + 1}")
 
-        # Plot every 100 episodes
         if (episode + 1) % 100 == 0:
             plt.figure(figsize=(12,5))
 
@@ -533,8 +452,7 @@ def train_td3():
             plt.tight_layout()
             plt.show()
 
-            # Additional plot: average reward per every 10 episodes
-            chunk_size = 10
+            chunk_size = 20
             avg_rewards = [
                 np.mean(episode_rewards[i:i + chunk_size])
                 for i in range(0, len(episode_rewards), chunk_size)
@@ -550,13 +468,12 @@ def train_td3():
             plt.legend()
             plt.show()
 
-    # Save final model
     torch.save(agent.actor.state_dict(), os.path.join(save_dir, "actor_final.pth"))
     torch.save(agent.critic.state_dict(), os.path.join(save_dir, "critic_final.pth"))
     print("Saved final models")
-    
+
     writer.close()
     env.close()
-
+    
 if __name__ == "__main__":
     train_td3()
