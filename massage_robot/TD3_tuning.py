@@ -28,6 +28,8 @@ def hyperparameter_tuning():
 
     episodes = 10
     start_timesteps = 300
+    loss_window_size = 5
+    early_stop_reward_threshold = 5000  # Adjusted threshold based on your logs
 
     for lr in learning_rates:
         for batch_size in batch_sizes:
@@ -69,6 +71,9 @@ def hyperparameter_tuning():
                                 smooth_target_prev = None
 
                                 early_stop = False
+
+                                recent_critic_losses = deque(maxlen=loss_window_size)
+                                recent_actor_losses = deque(maxlen=loss_window_size)
 
                                 for episode in range(episodes):
                                     local_reset(env)
@@ -137,15 +142,36 @@ def hyperparameter_tuning():
                                             if actor_loss is not None:
                                                 actor_losses.append(actor_loss)
                                                 critic_losses.append(critic_loss)
+                                                recent_actor_losses.append(actor_loss)
+                                                recent_critic_losses.append(critic_loss)
 
-                                        if done:
+                                                # Adaptive threshold check for critic loss
+                                                if len(recent_critic_losses) == loss_window_size:
+                                                    mean_critic = np.mean(recent_critic_losses)
+                                                    std_critic = np.std(recent_critic_losses)
+                                                    upper_critic_threshold = mean_critic + 3 * std_critic
+                                                    if critic_loss > upper_critic_threshold:
+                                                        print(f"Early stopping: Critic loss {critic_loss:.3f} exceeded threshold {upper_critic_threshold:.3f}")
+                                                        early_stop = True
+                                                        break
+
+                                                # Adaptive threshold check for actor loss (optional)
+                                                if len(recent_actor_losses) == loss_window_size:
+                                                    mean_actor = np.mean(recent_actor_losses)
+                                                    std_actor = np.std(recent_actor_losses)
+                                                    lower_actor_threshold = mean_actor - 3 * std_actor
+                                                    if actor_loss < lower_actor_threshold:
+                                                        print(f"Warning: Actor loss {actor_loss:.3f} below threshold {lower_actor_threshold:.3f}")
+                                                        # Optional: early_stop = True
+
+                                        if done or early_stop:
                                             break
 
                                     episode_rewards.append(episode_reward)
                                     print(f"Episode {episode + 1}, Reward: {episode_reward:.3f}")
 
-                                    if episode_rewards and np.mean(episode_rewards[-5:]) < 50.0:
-                                        print(f"Early stopping: Average reward below threshold at episode {episode+1}")
+                                    if episode_rewards and np.mean(episode_rewards[-5:]) < early_stop_reward_threshold:
+                                        print(f"Early stopping: Average reward below threshold ({early_stop_reward_threshold}) at episode {episode+1}")
                                         early_stop = True
 
                                     if early_stop:
