@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pybullet as p
 import pybullet_data
-from env import MassageEnv  # Import MassageEnv from env.py as in TD3_train.py
+from env_test1 import MassageEnv  # Import MassageEnv from env.py as in TD3_train.py
 from TD3_train import Actor, local_step, get_action_bounds  # Import other needed components
 from torch.utils.tensorboard import SummaryWriter
 
@@ -41,7 +41,7 @@ def run_inference(env, agent, episode_length, writer=None):
         x_min = np.min(env.pntsAndReturn[:, 0])
         x_max = np.max(env.pntsAndReturn[:, 0])
         x_range = x_max - x_min
-        oscillation_period = episode_length
+        oscillation_period = episode_length / 2
         x_oscillate = x_min + (x_range / 2) * (1 + np.sin(2 * np.pi * t / oscillation_period))
 
         y_fixed = 0.3
@@ -93,7 +93,7 @@ def main():
     action_dim = 3  # Adjust if your action space differs
     max_action = 1.0
 
-    actor_path = "models/actor_final.pth"  # Path to your saved actor model
+    actor_path = "models/actor_episode_800.pth"  # Path to your saved actor model
 
     agent = load_agent(state_dim, action_dim, max_action, actor_path)
 
