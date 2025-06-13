@@ -246,9 +246,11 @@ def check_all_link_contacts(env):
                 contact_force = c[9]
                 print(f"    Contact point: {contact_pos}, Force: {contact_force:.4f}")        
 
+import numpy as np
+
 def train_td3():
     writer = SummaryWriter(log_dir="./runs/td3_training")
-    env = MassageEnv(render=False)  # Use env.py's MassageEnv
+    env = MassageEnv(render=True)  # Use env.py's MassageEnv
 
     # Disable collisions for all arm links except end effector
     for link_idx in range(p.getNumJoints(env.armId)):
@@ -265,12 +267,12 @@ def train_td3():
     agent = TD3(state_dim, action_dim, max_action)
 
     best_params = {
-        'learning_rate': 0.001,
+        'learning_rate': 0.0003,
         'batch_size': 256,
-        'discount': 0.999,
+        'discount': 0.99,
         'tau': 0.01,
         'policy_noise': 0.1,
-        'noise_clip': 0.3,
+        'noise_clip': 0.5,
         'policy_freq': 2
     }
 
@@ -284,8 +286,9 @@ def train_td3():
 
     replay_buffer = ReplayBuffer()
 
-    episodes = 100
+    episodes = 1000
     episode_length = 1440
+    #episode_length = 360
     batch_size = best_params['batch_size']
     start_timesteps = 300
 
@@ -392,6 +395,16 @@ def train_td3():
         print(f"Episode {episode + 1}, Reward: {episode_reward:.3f}")
         writer.add_scalar('Reward/Episode', episode_reward, episode)
 
+        # Print mean and variance every 100 episodes
+        if (episode + 1) % 100 == 0:
+            recent_rewards = episode_rewards[-100:]
+            mean_return = np.mean(recent_rewards)
+            var_return = np.var(recent_rewards)
+            print(f"\nEpisodic Return Stats for episodes {episode - 99} to {episode + 1}:")
+            print(f"Mean: {mean_return:.2f}")
+            print(f"Variance: {var_return:.2f}")
+            print(f"Mean ± Variance: {mean_return:.2f} ± {var_return:.2f}\n")
+
         all_Forces.extend(env.Forces)
         all_bodyparts.extend(env.bodyparts)
         all_armparts.extend(env.armparts)
@@ -399,7 +412,7 @@ def train_td3():
         all_new_path.extend(env.new_path)
         all_actual_path.extend(env.actual_path)
 
-        if (episode + 1) % 100 == 0:
+        if (episode + 1) % 200 == 0:
             draw_data(
                 all_Forces,
                 all_armparts,
@@ -415,14 +428,14 @@ def train_td3():
             all_new_path.clear()
             all_actual_path.clear()
 
-        if (episode + 1) % 100 == 0:
+        if (episode + 1) % 200 == 0:
             actor_path = os.path.join(save_dir, f"actor_episode_{episode+1}.pth")
             critic_path = os.path.join(save_dir, f"critic_episode_{episode+1}.pth")
             torch.save(agent.actor.state_dict(), actor_path)
             torch.save(agent.critic.state_dict(), critic_path)
             print(f"Saved models at episode {episode + 1}")
 
-        if (episode + 1) % 100 == 0:
+        if (episode + 1) % 200 == 0:
             plt.figure(figsize=(12,5))
 
             plt.subplot(1, 3, 1)
@@ -452,7 +465,7 @@ def train_td3():
             plt.tight_layout()
             plt.show()
 
-            chunk_size = 20
+            chunk_size = 10
             avg_rewards = [
                 np.mean(episode_rewards[i:i + chunk_size])
                 for i in range(0, len(episode_rewards), chunk_size)
@@ -467,6 +480,16 @@ def train_td3():
             plt.grid()
             plt.legend()
             plt.show()
+
+    # Summary table at the end of training
+    print("\nSummary of Mean ± Variance of Episodic Returns (last 100 episodes):")
+    print(f"{'TD3 Noisy':<30} {'Mean':>10} {'Variance':>15} {'Mean ± Variance':>20}")
+    print("-" * 80)
+
+    recent_rewards = episode_rewards[-100:]
+    mean_return = np.mean(recent_rewards)
+    var_return = np.var(recent_rewards)
+    print(f"{'TD3 (Noisy Env)':<30} {mean_return:10.2f} {var_return:15.2f} {mean_return:.2f} ± {var_return:.2f}")
 
     torch.save(agent.actor.state_dict(), os.path.join(save_dir, "actor_final.pth"))
     torch.save(agent.critic.state_dict(), os.path.join(save_dir, "critic_final.pth"))
