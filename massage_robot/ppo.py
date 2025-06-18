@@ -44,9 +44,9 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "MassageEnv"
     """the id of the environment"""
-    total_timesteps: int = 800000
+    total_timesteps: int = 1000000
     """total timesteps of the experiments"""
-    learning_rate: float = 3e-5
+    learning_rate: float = 5e-5
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
@@ -109,20 +109,20 @@ class Agent(nn.Module):
     def __init__(self, envs):
         super().__init__()
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space).prod(), 64)),
+            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0),
         )
         self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space).prod(), 64)),
+            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, np.prod(envs.single_action_space)), std=0.01),
+            layer_init(nn.Linear(64, np.prod(envs.single_action_space.shape)), std=0.01),
         )
-        self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space)))
+        self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space.shape)))
 
     def get_value(self, x):
         return self.critic(x)
@@ -160,14 +160,14 @@ if __name__ == "__main__":
 
     # env setup
 
-    envs = [MassageEnv(render=False)  for i in range(args.num_envs)]
+    envs = [MassageEnv(render=False,train=False)  for i in range(args.num_envs)]
 
     agent = Agent(envs[0]).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
-    obs = torch.zeros((args.num_steps, args.num_envs) + envs[0].single_observation_space).to(device)
-    actions = torch.zeros((args.num_steps, args.num_envs) + envs[0].single_action_space).to(device)
+    obs = torch.zeros((args.num_steps, args.num_envs) + envs[0].single_observation_space.shape).to(device)
+    actions = torch.zeros((args.num_steps, args.num_envs) + envs[0].single_action_space.shape).to(device)
     logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
@@ -229,9 +229,9 @@ if __name__ == "__main__":
             returns = advantages + values
 
         # flatten the batch
-        b_obs = obs.reshape((-1,) + envs[0].single_observation_space)
+        b_obs = obs.reshape((-1,) + envs[0].single_observation_space.shape)
         b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + envs[0].single_action_space)
+        b_actions = actions.reshape((-1,) + envs[0].single_action_space.shape)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
