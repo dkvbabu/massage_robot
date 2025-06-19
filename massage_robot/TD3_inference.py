@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pybullet as p
 import pybullet_data
-from env_test1 import MassageEnv  # Import MassageEnv from env.py as in TD3_train.py
+from env import MassageEnv  # Import MassageEnv from env.py as in TD3_train.py
 from TD3_train import Actor, local_step, get_action_bounds  # Import other needed components
 from torch.utils.tensorboard import SummaryWriter
 
