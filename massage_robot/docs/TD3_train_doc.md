@@ -36,3 +36,8 @@ This script implements the training pipeline for a Twin Delayed Deep Determinist
    Uses action smoothing and oscillation in the x-axis for exploration.  
    Logs rewards and losses, saves models periodically.  
    Visualizes training progress with matplotlib.
+
+**Training Video** 
+
+https://drive.google.com/file/d/1ZZ3CPmYQvJvtA7DchJper8dUnqdjyky2/view?usp=sharing
+
