@@ -39,5 +39,5 @@ This script implements the training pipeline for a Twin Delayed Deep Determinist
 
 **Training Video** 
 
-https://drive.google.com/file/d/1ZZ3CPmYQvJvtA7DchJper8dUnqdjyky2/view?usp=sharing
+https://drive.google.com/file/d/1ZZ3CPmYQvJvtA7DchJper8dUnqdjyky2/preview
 
