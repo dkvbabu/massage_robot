@@ -1,24 +1,44 @@
+"""Mapping stub for future mesh reconstruction and surface mapping."""
 import numpy as np
-from scipy.spatial import Delaunay
 
 class SurfaceMapper:
-    """
-    Builds a 3D mesh of the human phantom surface from depth or point clouds.
-    """
     def __init__(self):
-        self.points = []
+        self.scans = []
+        self.intrinsics = None
 
-    def add_scan(self, depth_image, intrinsics):
-        h, w = depth_image.shape
-        fx, fy, cx, cy = intrinsics
-        xs, ys = np.meshgrid(np.arange(w), np.arange(h))
-        zs = depth_image
-        xs = (xs - cx) * zs / fx
-        ys = (ys - cy) * zs / fy
-        pts = np.stack([xs, ys, zs], axis=-1).reshape(-1,3)
-        self.points.append(pts)
+    def add_scan(self, depth, intrinsics):
+        """Add a depth scan to the mapping."""
+        self.scans.append(depth)
+        self.intrinsics = intrinsics
 
     def reconstruct(self):
-        all_pts = np.vstack(self.points)
-        tri = Delaunay(all_pts[:10000])
-        return all_pts, tri.simplices
+        """Reconstruct surface from accumulated scans."""
+        if not self.scans:
+            return np.zeros((0, 3)), np.zeros((0, 3))
+            
+        # Simple reconstruction: average depths
+        avg_depth = np.mean(self.scans, axis=0)
+        h, w = avg_depth.shape
+        
+        # Create point cloud
+        fx, fy, cx, cy = self.intrinsics
+        y, x = np.mgrid[0:h, 0:w]
+        z = avg_depth
+        
+        # Convert to 3D points
+        X = (x - cx) * z / fx
+        Y = (y - cy) * z / fy
+        points = np.stack([X, Y, z], axis=-1).reshape(-1, 3)
+        
+        # Create simple triangulation
+        faces = []
+        for i in range(h-1):
+            for j in range(w-1):
+                idx = i * w + j
+                faces.append([idx, idx+1, idx+w])
+                faces.append([idx+1, idx+w+1, idx+w])
+        
+        return points, np.array(faces)
+
+def reconstruct_mesh():
+    pass

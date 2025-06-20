@@ -1,5 +1,5 @@
 import pytest
-from massage_robot.force_control import ForceController
+from massage_robot.force_control import ForceController, apply_force_control
 
 def test_compute_torque_zero_error():
     ctrl = ForceController(kp=1.0, ki=0.0, kd=0.0, target_force=10.0)
@@ -15,3 +15,7 @@ def test_compute_torque_pid_behavior():
 def test_reward_quadratic():
     ctrl = ForceController(target_force=8.0)
     assert ctrl.reward(6.0) == pytest.approx(- (6.0 - 8.0)**2)
+
+def test_apply_force_control():
+    # Just check that the function can be called (stub)
+    apply_force_control()

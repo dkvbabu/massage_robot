@@ -1,24 +1,28 @@
-## massage_robot/force_control.py
-import numpy as np
+"""Force/torque control stub for future PID or RL-based control."""
 
 class ForceController:
-    """
-    PID-based force control, with methods to compute torque commands and rewards.
-    """
-    def __init__(self, kp=1.0, ki=0.01, kd=0.05, target_force=10.0):
-        self.kp, self.ki, self.kd = kp, ki, kd
-        self.target = target_force
+    def __init__(self, kp=1.0, ki=0.0, kd=0.0, target_force=10.0):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.target_force = target_force
         self.integral = 0.0
-        self.prev_error = 0.0
+        self.last_error = 0.0
 
     def compute_torque(self, current_force, dt):
-        error = self.target - current_force
+        error = self.target_force - current_force
         self.integral += error * dt
-        derivative = (error - self.prev_error) / dt
-        self.prev_error = error
-        torque = self.kp*error + self.ki*self.integral + self.kd*derivative
+        derivative = (error - self.last_error) / dt if dt > 0 else 0
+        self.last_error = error
+        
+        torque = (self.kp * error + 
+                 self.ki * self.integral + 
+                 self.kd * derivative)
         return torque
 
-    def reward(self, current_force):
-        # Negative quadratic cost around target
-        return - (current_force - self.target)**2
+    def reward(self, force):
+        """Compute reward based on force error."""
+        return -((force - self.target_force) ** 2)
+
+def apply_force_control():
+    pass
