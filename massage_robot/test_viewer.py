@@ -73,14 +73,10 @@ def load_scene(physicsClient):
     human_controllable_joint_indices = []#(human.right_arm_joints)]
     human_inst = Human(human_controllable_joint_indices, controllable=False)
 
-    configP = configparser.ConfigParser()
-    configP.read(os.path.join((os.path.dirname(os.path.realpath(__file__))), './human/config.ini'))
-    def config(tag, section=None):
-        return float(configP['' if section is None else section][tag])
 
     gender = 'male'
     human_inst.init(human_creation, None,True, 'none', gender,config=None,id=physicsClient,
-                    np_random=np.random,mass=70,radius_scale=1.2, height_scale=1.1)
+                    np_random=np.random,mass=90,radius_scale=1.2, height_scale=1.1)
 
     # Add bed
     furniture = Furniture()
