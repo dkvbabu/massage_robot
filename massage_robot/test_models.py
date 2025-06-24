@@ -18,10 +18,11 @@ from TD3_train import Actor
 
 def main():
 
-    NoRL = True
+    NoRL = False
     PPOModel = False
     EnvNoise = False
-    env = MassageEnv(render=True,auto_reset=False,train=EnvNoise)
+    MassageAlongX = False
+    env = MassageEnv(render=True,auto_reset=False ,train=EnvNoise,MassageAlongX = MassageAlongX)
     #state = env.get_state()
     #state_dim = len(state)  # This will now include the 5 new features
     #action_dim = 3
@@ -38,7 +39,10 @@ def main():
         #DDPG
         agent = ActorDDPG(env).to(device)
         #model_name = 'runs/MassageEnv_DDPG__ddpg__1__1749564959/ddpg.cleanrl_model' # with noise
-        model_name = 'runs/MassageEnv_DDPG__ddpg__1__1749725147/ddpg.cleanrl_model' # no noise
+        if MassageAlongX:
+            model_name = 'runs/MassageEnv_DDPG__ddpg__1__1749725147/ddpg.cleanrl_model' # no noise
+        else:
+            model_name = 'runs/MassageEnv_DDPG_Y__ddpg__1__1750248626/ddpg.cleanrl_model' # no noise (Length)
         agent.load_state_dict(torch.load(model_name,map_location=device)[0])
     #agent = Actor(state_dim,action_dim,max_action).to(device)
     #model_name = 'runs/MassageEnv__ppo__1__1749045480/ppo.cleanrl_model'
@@ -47,7 +51,7 @@ def main():
 
     state = env.reset()
     all_returns = []
-    tests_n = 1
+    tests_n = 10
     for i in range(env.episode_length*tests_n):
 
         with torch.no_grad():

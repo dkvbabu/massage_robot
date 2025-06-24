@@ -59,7 +59,7 @@ def main():
     NoRL = False
     PPOModel = True
     EnvNoise = False
-    env = MassageEnv(render=True,auto_reset=False)#,train=EnvNoise)
+    env = MassageEnv(render=False,auto_reset=False)#,train=EnvNoise)
     #state = env.get_state()
     #state_dim = len(state)  # This will now include the 5 new features
     #action_dim = 3
@@ -85,7 +85,7 @@ def main():
 
     state = env.reset()
     all_returns = []
-    tests_n = 1
+    tests_n = 100
     smooth_target_prev = None
     prev_action = np.zeros(3)
     for i in range(env.episode_length*tests_n):
@@ -121,7 +121,7 @@ def main():
             #print(f'Episodic rewards: {info["episode"]['r']}')
             #all_returns.append(info["episode"]['r'])
 
-        time.sleep(0.02)
+        #time.sleep(0.02)
     
     print(f'Case {['DDPG','PPO'][PPOModel]} with{['out',''][EnvNoise]} noise:')
     print(f'Mean Return: {np.array(all_returns).mean()}')
