@@ -1,6 +1,6 @@
 
 
-# Autonomous Robotic Massage Simulation
+# Autonomous Robotic System for Massage
 
 *Authors: Yasin Yousif (https://www.rlbyexample.net/), Venkatesh Babu (https://github.com/dkvbabu)*
 
@@ -102,52 +102,56 @@ For Reinforcement learning (RL) task, we explore three state-of-the-art RL algor
 Each algorithm offers unique strengths, and their implementations highlight best practices in training, exploration, and stability. In practice, it is wise to benchmark all of them and choose the most suitable one for our use case, which is what we have done here.
 
 ## Evaluation and Results
+In the following we show two types of curves for the full experiments done in this project. First the training curves resulted from tensorboard logging. Second, the pressure curve illustrating the arm normal force on the model.
 
-Training curves (description and results)
+Finally, a complete table for the performance of all methods is shown to define the best performing model.
+
+### Training Curves 
 	 	 	 	
-The training curve for the DDPG-Y model illustrates the learning progress of the robotic massage system when following a massage path along the Y axis of the simulation environment. The Y-axis of the graph represents the episodic return, which measures the cumulative reward obtained by the agent during each training episode. This curve provides insight into how effectively the model improves its performance over time in this specific task.
-
+The training curve for the DDPG-Y model illustrates the learning progress of the robotic massage system for the case of following a massage path along the Y axis of the simulation model. The Y-axis of the graph represents the episodic return, which measures the cumulative reward obtained by the agent during each training episode. The X-axis represents the training iterations. This curve below provides insight into how effectively the model improves its performance over time in this specific task.
 
 <center>
 <image width="100%" src="./media/DDPG_Y_tf.png"/>
 </br>
 <caption>
-State/Action/Reward Setup for our RL training step.
+DDPG Training Curve along the height of the model
 </caption>
 </center>
 
 
-This training curve compares the performance of the DDPG and PPO algorithms when trained on a massage path along the X axis of the simulation environment, with no noise introduced during training. The X-axis represents the episodic return, reflecting the cumulative reward per episode. The graph highlights the learning efficiency and stability of both methods under ideal, noise-free conditions.
+This next training curve below compares the performance of the DDPG and PPO algorithms when trained on a massage path along the X axis of the simulation environment, with no noise introduced during training. The graph highlights the learning efficiency and stability of both methods under ideal, noise-free conditions.
 
 <center>
 <image width="100%" src="./media/DDPG+PPO_tf.png"/>
 </br>
 <caption>
-State/Action/Reward Setup for our RL training step.
+DDPG and PPO Training Curve along the width of the model without random initialization.
 </caption>
 </center>
 
-The training curve for DDPG and PPO algorithms under noisy conditions shows the impact of environmental noise on learning performance along the X axis massage path. The X-axis again represents episodic return, but the presence of noise during training results in generally lower returns, indicating the increased difficulty the models face in adapting to uncertain and variable conditions.
+The training curves below for DDPG and PPO algorithms under noisy conditions shows the impact of environmental noise on learning performance along the X axis massage path (model width). The X-axis again represents episodic return, but the presence of noise during training results in generally lower returns, indicating the increased difficulty the models face in adapting to uncertain and variable conditions.
 
 <center>
 <image width="100%" src="./media/DDPG+PPO_tf_noise.png"/>
 </br>
 <caption>
-State/Action/Reward Setup for our RL training step.
+DDPG and PPO Training Curve along the width of the model with random initialization.
 </caption>
 </center>
 
-Overall, the training curves demonstrate that DDPG achieves the fastest and most stable learning progress, especially in noise-free environments, while the introduction of noise significantly challenges both DDPG and PPO, reducing their episodic returns and slowing convergence.
+> Overall, the training curves demonstrate that **DDPG achieves the fastest and most stable learning progress**, especially in noise-free environments, while the introduction of noise significantly challenges both DDPG and PPO, reducing their episodic returns and slowing convergence.
 
-The pressure curve over 700 simulation steps shows the contact force applied by the robotic end effector on the human model. Throughout most of the episode, the force remains below 50 Newtons, which is within a safe and comfortable range for massage. A notable spike occurs near the end, indicating a brief increase in applied pressure that may require further tuning to avoid discomfort or injury.
+### Pressure Curves
+
+The pressure curve over 360 simulation steps shows the contact force applied by the robotic end effector on the human model. Throughout most of the episode, the force remains below 50 Newtons, which is within a safe and comfortable range for massage. A notable spike occurs near the end (when exceeding the 360 step horizon), indicating a brief increase in applied pressure that shows a room for improvement to avoid discomfort or injury.
 	 	 	 	
-DDPG	 
+Additionally, the graphs here shows right under the pressure curve, a contact plot (where the end effector index is 7 indicating direct contact), the human model part contact, and the actual Z-value of the planned (blue) and the modified (orange) massage path.
 
 <center>
 <image width="100%" src="./media/DDPG_pressure.png"/>
 </br>
 <caption>
-State/Action/Reward Setup for our RL training step.
+DDPG pressure and contact curves over 720 steps (without noise along model width)
 </caption>
 </center>
 
@@ -157,31 +161,28 @@ The pressure curve for the DDPG-Y model over 360 steps reveals that the robotic 
 <image width="100%" src="./media/DDPG_Y_pressure.png"/>
 </br>
 <caption>
-State/Action/Reward Setup for our RL training step.
+DDPG pressure and contact curves over 360 steps (without noise along model height)
 </caption>
 </center>
 
-The pressure curves confirm that the trained models generally maintain safe contact forces during massage, with DDPG variants showing consistent control under the 50 Newton threshold, though occasional spikes highlight areas for potential improvement in force regulation.
+The table below presents the mean and standard deviation of episodic returns over 100 samples for various reinforcement learning methods under both stable and noisy environmental conditions. The methods benchmarked include no reinforcement learning (No RL), PPO, DDPG, DDPG trained along the Y axis (DDPG-Y), and TD3 without path guidance. **Results indicate that DDPG and DDPG-Y achieve the highest returns in stable environments, while noisy conditions generally reduce performance across all methods. Notably, DDPG maintains relatively strong performance even with noise, demonstrating robustness. TD3 fails without using the sine waves ad basis, reaching only 3300 as mean return. This shows the efficiency of our hybrid proposed model above**
 
 <center>
 <caption>
-Mean and variance of 100 samples (returns) for all Massage Controlling variants
+Mean and standard deviation of 100 samples (returns) for all Massage control variants
 </caption>
 </br>
 <image width="100%" src="./media/final_benchmark.png"/>
 </center>
 
-This table presents the mean and variance of episodic returns over 100 samples for various reinforcement learning methods under both stable and noisy environmental conditions. The methods benchmarked include no reinforcement learning (No RL), PPO, DDPG, DDPG trained along the Y axis (DDPG-Y), and TD3 without path guidance. Results indicate that DDPG and DDPG-Y achieve the highest returns in stable environments, while noisy conditions generally reduce performance across all methods. Notably, DDPG maintains relatively strong performance even with noise, demonstrating robustness.
-
-The benchmarking results highlight DDPG as the most effective RL method for this robotic massage task, achieving superior episodic returns and demonstrating resilience to environmental noise compared to PPO, TD3, and non-RL baselines.
-
+Finally, in the following, we show two demonstrating videos of the simulation scenarios utilizing DDPG along the height of the model (first video), then along the width of the model (second video), corresponding to the trained models above without noise.
 
 <center>
 <iframe width="420" height="315" src="https://drive.google.com/file/d/1lLkyTqW9EQfVA37ur6IbzFSUPPUFbFve/view?usp=sharing">
 </iframe> 
 </br>
 <caption>
-DDPG_Y
+DDPG model performing massage along the height of the human model (Y world axis)
 </caption>
 </center>
 
@@ -190,7 +191,7 @@ DDPG_Y
 </iframe> 
 </br>
 <caption>
-DDPG_X
+DDPG model performing massage along the width of the human model (X world axis)
 </caption>
 </center>
 
