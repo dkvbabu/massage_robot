@@ -4,21 +4,21 @@ import pybullet_data
 import numpy as np
 import cv2
 
-from massage_robot.utils import get_extrinsics, get_intrinsics, get_extrinsics2
+from utils import get_extrinsics, get_intrinsics, get_extrinsics2
 
 import configparser
 
-from massage_robot.human.human_creation import HumanCreation
-from massage_robot.human import agent, human
-from massage_robot.human.agent import Agent
-from massage_robot.human.human import Human
-from massage_robot.human.furniture import Furniture
+from human.human_creation import HumanCreation
+from human import agent, human
+from human.agent import Agent
+from human.human import Human
+from human.furniture import Furniture
 
 import matplotlib.pyplot as plt
 
 # from massage_robot.robot_descriptions import ur5_description
 
-from massage_robot.generate_path import generate_trajectory
+from generate_path import generate_trajectory
 from scipy.spatial.transform import Rotation
 
 
