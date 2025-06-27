@@ -54,7 +54,7 @@ The robotic therapist in this simulation is a UR5 arm, a widely used industrial 
 Inverse kinematics computes joint angles to reach target positions along generated paths, while position control with force limits ensures safe, smooth movements. This precise control framework allows the robot to execute complex, adaptive massage patterns in close proximity to the human model.
 
 <center>
-<image src="./media/full_scene.png"/>
+<image width="60%" src="./media/massage_y.gif"/>
 <caption>
 </br>
 Full simulated scene
@@ -178,8 +178,7 @@ Mean and standard deviation of 100 samples (returns) for all massage control var
 Finally, in the following, we show two demonstrating videos of the simulation scenarios utilizing DDPG along the height of the model (first video), then along the width of the model (second video), corresponding to the trained models above without noise.
 
 <center>
-<iframe width="420" height="315" src="https://drive.google.com/file/d/1lLkyTqW9EQfVA37ur6IbzFSUPPUFbFve/view?usp=sharing">
-</iframe> 
+<image width="70%" src="./media/massage_y.gif"/>
 </br>
 <caption>
 DDPG model performing massage along the height of the human model (Y world axis)
@@ -187,8 +186,7 @@ DDPG model performing massage along the height of the human model (Y world axis)
 </center>
 
 <center>
-<iframe width="420" height="315" src="https://drive.google.com/file/d/1Ztd-J13DOpI-5ge53epFzWbqVNDLNUxr/view?usp=sharing">
-</iframe> 
+<image width="70%" src="./media/massage_x.gif"/>
 </br>
 <caption>
 DDPG model performing massage along the width of the human model (X world axis)
